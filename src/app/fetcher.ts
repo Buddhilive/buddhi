@@ -38,5 +38,5 @@ const api = () => {
 };
 
 export const fetcher = (url: string): Promise<any> => {
-  return api().get(url).json();
+  return api().options({ credentials: 'include' }).get(url).json();
 };
