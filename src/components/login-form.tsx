@@ -1,15 +1,12 @@
-'use client';
+"use client";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import React from "react";
-import { useForm } from "react-hook-form";
-import { AuthActions } from "@/app/auth/utils";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { WretchError } from "wretch";
 
 type FormData = {
   email: string;
@@ -20,34 +17,41 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<FormData>();
-
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const { login, storeToken } = AuthActions();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-  const onSubmit = (data: FormData) => {
-    login(data.email, data.password)
-      .json((json) => {
-        storeToken(json.access, "access");
-        storeToken(json.refresh, "refresh");
-
-        router.push("dashboard");
-      })
-      .catch((err: WretchError) => {
-        console.error("Login error:", JSON.parse(err.message));
-        setError("root", { type: "manual", message: JSON.parse(err.message)?.errors[0].detail ?? "Unknown error" });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+        credentials: "include",
       });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        router.push("/dashboard");
+      } else {
+        setError(data.error || "Login failed");
+      }
+    } catch (err) {
+      setError("Network error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit}
       className={cn("flex flex-col gap-6", className)}
       {...props}
     >
@@ -64,17 +68,17 @@ export function LoginForm({
             id="email"
             type="email"
             placeholder="m@example.com"
-            {...register("email", { required: true })}
+            value={formData.email}
+            onChange={(e) =>
+              setFormData({ ...formData, email: e.target.value })
+            }
           />
-          {errors.email && (
-            <span className="text-xs text-red-600">Email is required</span>
-          )}
         </div>
         <div className="grid gap-3">
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
             <Link
-              href="/auth/password/reset-password"
+              href="/forgot-password"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
               Forgot your password?
@@ -83,18 +87,21 @@ export function LoginForm({
           <Input
             id="password"
             type="password"
-            {...register("password", { required: true })}
+            value={formData.password}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
           />
-          {errors.password && (
-            <span className="text-xs text-red-600">Password is required</span>
-          )}
         </div>
-        <Button type="submit" className="w-full">
-          Login
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Signing in..." : "Sign in"}
         </Button>
-        {errors.root && (
-          <span className="text-xs text-red-600">{errors.root.message}</span>
-        )}
+      </div>
+      <div className="text-center">
+        <span className="text-gray-600">Don't have an account? </span>
+        <Link href="/register" className="text-blue-600 hover:text-blue-500">
+          Sign up
+        </Link>
       </div>
     </form>
   );
