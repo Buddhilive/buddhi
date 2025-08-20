@@ -1,43 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import axios from 'axios';
 
-const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api/auth';
+const DJANGO_BASE_URL = process.env['NEXT_PUBLIC_API_BASE_URL'] || 'http://localhost:8000';
 
-export async function POST(request: NextRequest) {
-    const body = await request.json();
-    const { username, password } = body;
+/**
+ * Handles user login.
+ * Sends credentials to Django, receives tokens, and sets HTTP-only cookies.
+ */
+export async function POST(request: Request) {
+  const { email, password } = await request.json();
 
-    try {
-        const response = await fetch(`${DJANGO_API_URL}/api/auth/login/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ username, password }),
-        });
+  if (!email || !password) {
+    return NextResponse.json(
+      { message: 'Email and password are required' },
+      { status: 400 }
+    );
+  }
 
-        if (!response.ok) {
-            return NextResponse.json({ error: 'Login failed' }, { status: response.status });
-        }
+  try {
+    const response = await axios.post(`${DJANGO_BASE_URL}/api/user/login/`, {
+      email,
+      password,
+    });
 
-        // Get access and refresh tokens from the Django response headers
-        const djangoCookies = response.headers.getSetCookie();
-
-        // Set cookies in the Next.js response to the client
-        const nextResponse = new NextResponse(response.body, {
-            status: response.status,
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        djangoCookies.forEach(cookie => {
-            nextResponse.headers.append('Set-Cookie', cookie);
-        });
-
-        return nextResponse;
-    } catch (error) {
-        console.error('Login error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (response.status !== 200) {
+      return NextResponse.json(
+        { message: 'Login failed', error: response.data },
+        { status: response.status }
+      );
     }
+
+    // Create a new response to set cookies
+    const nextResponse = NextResponse.json({ success: true, message: 'Logged in successfully' });
+
+    return nextResponse;
+  } catch (error: any) {
+    const statusCode = error.response?.status || 500;
+    const errorData = error.response?.data || { message: 'Internal server error' };
+    console.error('Login error:', error);
+    return NextResponse.json(errorData, { status: statusCode });
+  }
 }

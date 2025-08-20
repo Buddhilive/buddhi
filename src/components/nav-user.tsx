@@ -30,32 +30,20 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import { AuthActions } from "@/app/auth/utils";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
-import { fetcher } from "@/app/fetcher";
+
 
 export function NavUser() {
   const { isMobile } = useSidebar();
 
-  const { data: user } = useSWR("/auth/users/me", fetcher);
-  console.log("user", user);
+  const user = {
+    username: "JohnDoe",
+    email: "john.doe@example.com",
+    avatar: "/avatars/john.jpg",
+  };
 
-  const router = useRouter();
-
-  const { logout, removeTokens } = AuthActions();
-
-  const handleLogout = () => {
-    logout()
-      .res(() => {
-        removeTokens();
-
-        router.push("/");
-      })
-      .catch(() => {
-        removeTokens();
-        router.push("/");
-      });
+  const handleLogout = async () => {
+    // Call the logout API and handle the response
   };
 
   return (

@@ -1,6 +1,8 @@
+import axios from 'axios';
 import { NextApiRequest } from 'next';
-import { authAPI } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+
+const DJANGO_BASE_URL = process.env['NEXT_PUBLIC_API_BASE_URL'] || 'http://localhost:8000';
 
 export async function POST(req: NextApiRequest) {
   if (req.method !== 'POST') {
@@ -8,7 +10,12 @@ export async function POST(req: NextApiRequest) {
   }
 
   try {
-    const response = await authAPI.register(req.body);
+    const response = await axios.post(`${DJANGO_BASE_URL}/api/register/`, req.body, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      withCredentials: true,
+    });
     return NextResponse.json(response.data, { status: 201 });
   } catch (error: any) {
     const statusCode = error.response?.status || 500;
