@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const response = await axios.post(`${DJANGO_BASE_URL}/api/user/login/`, {
       email,
       password,
-    });
+    }, { withCredentials: true});
 
     if (response.status !== 200) {
       return NextResponse.json(

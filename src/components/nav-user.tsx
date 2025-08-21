@@ -31,11 +31,12 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useRouter } from "next/navigation";
+import { logoutUser } from "@/utils/auth";
 
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-
+  const router = useRouter();
   const user = {
     username: "JohnDoe",
     email: "john.doe@example.com",
@@ -43,7 +44,16 @@ export function NavUser() {
   };
 
   const handleLogout = async () => {
-    // Call the logout API and handle the response
+    try {
+      const response = await logoutUser();
+      if (response.ok) {
+        router.push("/dashboard");
+      } else {
+        console.error("Logout failed:", response);
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (

@@ -25,9 +25,9 @@ export async function loginUser(email: string, password: string) {
   }
 }
 
-export async function logoutUser(param: any) {
+export async function logoutUser() {
   try {
-    const response = await axios.post(`/api/auth/logout/`, param);
+    const response = await axios.post(`/api/auth/logout/`);
     return NextResponse.json({ message: 'User logged out successfully', data: response.data, status: 200 });
   } catch (error: any) {
     return NextResponse.json({ message: 'User logout failed', error: error.message }, { status: 500 });
