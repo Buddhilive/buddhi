@@ -31,25 +31,55 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useRouter } from "next/navigation";
-import { logoutUser } from "@/utils/auth";
+import { logoutUser, getUserInfo } from "@/utils/auth";
+import { useState, useEffect } from "react";
 
+interface User {
+  username: string;
+  email: string;
+  avatar: string;
+}
 
 export function NavUser() {
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const user = {
-    username: "JohnDoe",
-    email: "john.doe@example.com",
-    avatar: "/avatars/john.jpg",
-  };
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await getUserInfo();
+        if (response.ok) {
+          const body = await response.json();
+          const newUser: User = {
+            username: body.data.email,
+            email: body.data.email,
+            avatar: body.data.avatar || 'next.svg',
+          };
+          setUser(newUser);
+        } else {
+          console.error("Failed to fetch user information:", response.status);
+          // If unauthorized, redirect to login
+          if (response.status === 401) {
+            router.push("/login");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user information:", error);
+        router.push("/login");
+      }
+    };
+
+    fetchUserInfo();
+  }, [router]);
 
   const handleLogout = async () => {
     try {
       const response = await logoutUser();
       if (response.ok) {
-        router.push("/dashboard");
+        router.push("/login");
       } else {
-        console.error("Logout failed:", response);
+        console.error("Logout failed:", response.status);
       }
     } catch (error) {
       console.error("Logout error:", error);

@@ -1,35 +1,87 @@
-import axios from 'axios';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export async function registerUser(email: string, password: string) {
-    try {
-      const response = await axios.post(`/api/auth/register/`, {
-        email,
-        password,
-      });
-      return NextResponse.json({ message: 'User registered successfully', data: response.data, status: 201 });
-    } catch (error: any) {
-      return NextResponse.json({ message: 'User registration failed', error: error.message }, { status: 500 });
+  try {
+    const response = await fetch(`/api/auth/register`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    return response;
+  } catch (error: any) {
+    console.error('User registration failed:', error);
+    throw error;
+  }
 }
 
 export async function loginUser(email: string, password: string) {
   try {
-    const response = await axios.post(`/api/auth/login/`, {
-      email,
-      password,
+    const response = await fetch(`/api/auth/login`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
     });
-    return NextResponse.json({ message: 'User logged in successfully', data: response.data, status: 200 });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response;
   } catch (error: any) {
-    return NextResponse.json({ message: 'User login failed', error: error.message }, { status: 500 });
+    console.error('User login failed:', error);
+    throw error;
   }
 }
 
 export async function logoutUser() {
   try {
-    const response = await axios.post(`/api/auth/logout/`);
-    return NextResponse.json({ message: 'User logged out successfully', data: response.data, status: 200 });
+    const response = await fetch(`/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response;
   } catch (error: any) {
-    return NextResponse.json({ message: 'User logout failed', error: error.message }, { status: 500 });
+    console.error('User logout failed:', error);
+    throw error;
+  }
+}
+
+export async function getUserInfo() {
+  try {
+    const response = await fetch(`/api/auth/user`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response;
+  } catch (error: any) {
+    console.error('User information retrieval failed:', error);
+    throw error;
   }
 }

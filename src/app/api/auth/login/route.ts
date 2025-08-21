@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import axios from 'axios';
 
 const DJANGO_BASE_URL = process.env['NEXT_PUBLIC_API_BASE_URL'] || 'http://localhost:8000';
@@ -31,8 +30,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create a new response to set cookies
-    const nextResponse = NextResponse.json({ success: true, message: 'Logged in successfully' });
+    // Create a new response to forward the data
+    const nextResponse = NextResponse.json({ 
+      success: true, 
+      message: 'Logged in successfully',
+      data: response.data
+    });
+
+    // Forward cookies from Django response to client
+    const setCookieHeader = response.headers['set-cookie'];
+    if (setCookieHeader) {
+      setCookieHeader.forEach((cookie: string) => {
+        const [nameValue, ...attributes] = cookie.split(';');
+        const [name, value] = nameValue.split('=');
+        
+        // Set the cookie on the response
+        nextResponse.cookies.set(name.trim(), value, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+        });
+      });
+    }
 
     return nextResponse;
   } catch (error: any) {

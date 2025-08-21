@@ -1,25 +1,51 @@
 import axios from "axios";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const DJANGO_BASE_URL =
   process.env["NEXT_PUBLIC_API_BASE_URL"] || "http://localhost:8000";
 
 /**
  * Handles user logout.
- * Clears authentication cookies.
+ * Forwards authentication cookies and clears them.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Get cookies from the incoming request
+    const cookieHeader = request.headers.get("cookie");
+    
     const response = await axios.post(
       `${DJANGO_BASE_URL}/api/user/logout/`,
       null,
-      { withCredentials: true }
+      {
+        headers: {
+          ...(cookieHeader && { Cookie: cookieHeader }),
+        },
+        withCredentials: true,
+      }
     );
-    // Create a new response to set cookies
+    
+    // Create a new response
     const nextResponse = NextResponse.json({
       success: true,
       message: "Logged out successfully",
       data: response.data,
+    });
+
+    // Clear the authentication cookies
+    nextResponse.cookies.set('access_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(0), // Expire the cookie
+    });
+    
+    nextResponse.cookies.set('refresh_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(0), // Expire the cookie
     });
 
     return nextResponse;
