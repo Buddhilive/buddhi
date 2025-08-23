@@ -30,32 +30,60 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import { AuthActions } from "@/app/auth/utils";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
-import { fetcher } from "@/app/fetcher";
+import { logoutUser, getUserInfo } from "@/utils/auth";
+import { useState, useEffect } from "react";
+
+interface User {
+  username: string;
+  email: string;
+  avatar: string;
+}
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-
-  const { data: user } = useSWR("/auth/users/me", fetcher);
-  console.log("user", user);
-
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
 
-  const { logout, removeTokens } = AuthActions();
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await getUserInfo();
+        if (response.ok) {
+          const body = await response.json();
+          const newUser: User = {
+            username: body.data.email,
+            email: body.data.email,
+            avatar: body.data.avatar || 'next.svg',
+          };
+          setUser(newUser);
+        } else {
+          console.error("Failed to fetch user information:", response.status);
+          // If unauthorized, redirect to login
+          if (response.status === 401) {
+            router.push("/login");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user information:", error);
+        router.push("/login");
+      }
+    };
 
-  const handleLogout = () => {
-    logout()
-      .res(() => {
-        removeTokens();
+    fetchUserInfo();
+  }, [router]);
 
-        router.push("/");
-      })
-      .catch(() => {
-        removeTokens();
-        router.push("/");
-      });
+  const handleLogout = async () => {
+    try {
+      const response = await logoutUser();
+      if (response.ok) {
+        router.push("/login");
+      } else {
+        console.error("Logout failed:", response.status);
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (

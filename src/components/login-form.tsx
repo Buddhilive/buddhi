@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { loginUser } from "@/utils/auth";
 
 type FormData = {
   email: string;
@@ -28,19 +29,13 @@ export function LoginForm({
     setError("");
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
+      const response = await loginUser(formData.email, formData.password);
+      console.log("Login response:", response);
       if (response.ok) {
         router.push("/dashboard");
       } else {
-        setError(data.error || "Login failed");
+        setError("Login failed");
+        console.error("Login error:", response);
       }
     } catch (err) {
       setError("Network error occurred");
