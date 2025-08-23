@@ -85,3 +85,24 @@ export async function getUserInfo() {
     throw error;
   }
 }
+
+export async function refreshToken() {
+  try {
+    const response = await fetch(`/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response;
+  } catch (error: any) {
+    console.error('User token refresh failed:', error);
+    throw error;
+  }
+}

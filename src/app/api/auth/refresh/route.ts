@@ -1,50 +1,60 @@
-import { NextResponse } from 'next/server';
-import { djangoFetch, setAuthCookies, clearAuthCookies } from '@/utils/auth';
-import { cookies } from 'next/headers';
+import axios from "axios";
+import { NextRequest, NextResponse } from "next/server";
+
+const DJANGO_BASE_URL =
+  process.env["NEXT_PUBLIC_API_BASE_URL"] || "http://localhost:8000";
 
 /**
- * Handles refreshing authentication tokens.
- * Reads refresh token from cookie, sends to Django, and updates cookies with new tokens.
+ * Handles token refresh.
+ * Forwards authentication cookies and returns new tokens.
  */
-export async function POST(request: Request) {
-  const cookieStore = cookies();
-  const refreshToken = (await cookieStore).get('refreshToken')?.value;
-
-  if (!refreshToken) {
-    return NextResponse.json(
-      { message: 'No refresh token found' },
-      { status: 401 }
+export async function POST(request: NextRequest) {
+  try {
+    // Get cookies from the incoming request
+    const cookieHeader = request.headers.get("cookie");
+    
+    const response = await axios.post(
+      `${DJANGO_BASE_URL}/api/user/token-refresh/`,
+      null,
+      {
+        headers: {
+          ...(cookieHeader && { Cookie: cookieHeader }),
+        },
+        withCredentials: true,
+      }
     );
+    
+    // Create a new response
+    const nextResponse = NextResponse.json({
+      success: true,
+      message: "Token refreshed successfully",
+      data: response.data,
+    });
+
+    // Clear the authentication cookies
+    nextResponse.cookies.set('access_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(0), // Expire the cookie
+    });
+    
+    nextResponse.cookies.set('refresh_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(0), // Expire the cookie
+    });
+
+    return nextResponse;
+  } catch (error: any) {
+    const statusCode = error.response?.status || 500;
+    const errorData = error.response?.data || {
+      message: "Internal server error",
+    };
+    console.error("Token refresh error:", error);
+    return NextResponse.json(errorData, { status: statusCode });
   }
-
-  // Call Django refresh token endpoint
-  const djangoResponse = await djangoFetch('/token/refresh/', {
-    method: 'POST',
-    body: JSON.stringify({ refresh: refreshToken }),
-  });
-
-  const response = NextResponse.json({}); // Default response to modify
-
-  if (!djangoResponse.ok) {
-    // If refresh fails (e.g., refresh token expired or invalid)
-    // Clear cookies and return error
-    clearAuthCookies(response);
-    const errorData = await djangoResponse.json();
-    return NextResponse.json(errorData, { status: djangoResponse.status });
-  }
-
-  const { access, refresh: newRefreshToken } = await djangoResponse.json();
-
-  if (!access || !newRefreshToken) {
-    clearAuthCookies(response);
-    return NextResponse.json(
-      { message: 'Token refresh failed: New tokens not received' },
-      { status: 500 }
-    );
-  }
-
-  // Set new HTTP-only cookies
-  setAuthCookies(response, access, newRefreshToken);
-
-  return response;
 }
