@@ -1,4 +1,8 @@
+![Buddhi AI Logo](./public/logos/buddhi-ai-logo-64.png)
+
 # Buddhi AI
+
+Buddhi AI is a user friendly AI agent development framework.
 
 ## Project Setup
 
@@ -20,4 +24,43 @@ On macOS/Linux, use:
 
 ```bash
 source dojo/bin/activate
+```
+
+### Install Dependencies
+
+To install the required dependencies for the project, run the following command:
+
+```shell
+pip install -r requirements.txt
+```
+
+### Run backend app
+
+To run the Django backend app, first navigate to backend folder:
+
+```shell
+cd backend
+```
+
+then start the Django app
+
+```shell
+py manage.py runserver
+```
+
+### Django Database Migrations
+
+To apply any database changes or migrations run following commands:
+
+```shell
+py manage.py makemigrations
+py manage.py migrate
+```
+
+### Create a Super User (Admin)
+
+To create a superuser (admin) account for the Django admin panel, run the following command:
+
+```shell
+py manage.py createsuperuser
 ```
