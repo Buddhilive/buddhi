@@ -6,6 +6,20 @@ Buddhi AI is a user friendly AI agent development framework.
 
 ## Project Setup
 
+To set up the project, follow these steps:
+
+### Create .env file
+
+Create a `.env` file in the root directory of the project and add the following environment variables:
+
+```yml
+DEBUG=1
+DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+SECRET_KEY="<your-secret-key>"
+DOMAIN = 'localhost:3000'
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
 ### Creating a Python Virtual Environment
 
 To create a Python virtual environment named `dojo`, run the following command in your terminal:
