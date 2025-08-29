@@ -50,31 +50,8 @@ pip install -r requirements.txt
 
 ### Run backend app
 
-To run the Django backend app, first navigate to backend folder:
+To run the FastAPI backend app, use the following command:
 
 ```shell
-cd backend
-```
-
-then start the Django app
-
-```shell
-py manage.py runserver
-```
-
-### Django Database Migrations
-
-To apply any database changes or migrations run following commands:
-
-```shell
-py manage.py makemigrations
-py manage.py migrate
-```
-
-### Create a Super User (Admin)
-
-To create a superuser (admin) account for the Django admin panel, run the following command:
-
-```shell
-py manage.py createsuperuser
+uvicorn api.main:app --reload
 ```
