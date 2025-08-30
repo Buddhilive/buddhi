@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .database import Base, engine
+from .routers import auth
 
 app = FastAPI()
+
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,5 +16,7 @@ app.add_middleware(
 )
 
 @app.get('/')
-def read_root():
-    return {"Hello": "Namo Buddhaya!"}
+def health_check():
+    return {"message": "Welcome to Buddhi AI!"}
+
+app.include_router(auth.router)
