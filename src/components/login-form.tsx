@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginUser } from "@/utils/auth";
+import { loginUser } from "@/utils/auth-utils";
 
 type FormData = {
-  email: string;
+  username: string;
   password: string;
 };
 
@@ -18,31 +18,29 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    try {
-      const response = await loginUser(formData.email, formData.password);
-      console.log("Login response:", response);
-      if (response.ok) {
+    const result = await loginUser(formData);
+
+    if (result.success) {
+      // Wait a bit for cookies to be set
+      setTimeout(() => {
         router.push("/dashboard");
-      } else {
-        setError("Login failed");
-        console.error("Login error:", response);
-      }
-    } catch (err) {
-      setError("Network error occurred");
-    } finally {
-      setLoading(false);
+      }, 100);
+    } else {
+      setError(result.error || "Login failed");
     }
-  };
+
+    setLoading(false);
+  }
 
   return (
     <form
@@ -58,26 +56,26 @@ export function LoginForm({
       </div>
       <div className="grid gap-6">
         <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="username">Username</Label>
           <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            value={formData.email}
+            id="username"
+            type="text"
+            placeholder="your username"
+            value={formData.username}
             onChange={(e) =>
-              setFormData({ ...formData, email: e.target.value })
+              setFormData({ ...formData, username: e.target.value })
             }
           />
         </div>
         <div className="grid gap-3">
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
-            <Link
+            {/* <Link
               href="/forgot-password"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
               Forgot your password?
-            </Link>
+            </Link> */}
           </div>
           <Input
             id="password"
@@ -92,11 +90,16 @@ export function LoginForm({
           {loading ? "Signing in..." : "Sign in"}
         </Button>
       </div>
+      {error && (
+        <div className="text-center">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
       <div className="text-center">
-        <span className="text-gray-600">Don't have an account? </span>
+        {/* <span className="text-gray-600">Don't have an account? </span>
         <Link href="/register" className="text-blue-600 hover:text-blue-500">
           Sign up
-        </Link>
+        </Link> */}
       </div>
     </form>
   );
