@@ -6,21 +6,27 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from backend.models.base import User
-from tests.test_utils import create_test_user
+from tests.test_utils import create_test_user, create_authenticated_client, authenticate_existing_user
 
 
 @pytest.mark.integration
 class TestUserWorkflow:
     """Test complete user workflows"""
     
-    def test_complete_user_registration_and_login_flow(self, client: TestClient):
-        """Test the complete flow: register -> login -> access protected endpoint -> logout"""
-        # Step 1: Register a new user
+    def test_complete_user_registration_and_login_flow(self, client: TestClient, db_session: Session):
+        """Test the complete flow: admin creates user -> user login -> access protected endpoint -> logout"""
+        # Step 1: Create admin user directly in database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        
+        # Step 2: Admin logs in to create new users
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
+        # Step 3: Admin creates a new user
         user_data = {"username": "integrationuser", "password": "integrationpass123"}
-        register_response = client.post("/auth/create", json=user_data)
+        register_response = client.post("/auth/create", json=user_data, cookies=admin_cookies)
         assert register_response.status_code == 201
         
-        # Step 2: Login with the new user
+        # Step 4: Login with the new user
         login_response = client.post("/auth/login", data=user_data)
         assert login_response.status_code == 200
         login_data = login_response.json()
@@ -124,14 +130,18 @@ class TestUserWorkflow:
 class TestErrorHandling:
     """Test error handling across the application"""
     
-    def test_malformed_requests(self, client: TestClient):
+    def test_malformed_requests(self, client: TestClient, db_session: Session):
         """Test handling of malformed requests"""
+        # Create admin user and authenticate
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
         # Test malformed JSON
-        response = client.post("/auth/create", data="invalid json", headers={"Content-Type": "application/json"})
+        response = client.post("/auth/create", data="invalid json", headers={"Content-Type": "application/json"}, cookies=admin_cookies)
         assert response.status_code == 422
         
         # Test wrong content type
-        response = client.post("/auth/create", data="username=test&password=test")
+        response = client.post("/auth/create", data="username=test&password=test", cookies=admin_cookies)
         assert response.status_code == 422
 
     def test_rate_limiting_behavior(self, client: TestClient):
@@ -145,13 +155,17 @@ class TestErrorHandling:
         # All requests should succeed (or consistently rate limited)
         assert all(status in [200, 429] for status in responses)
 
-    def test_database_error_handling(self, client: TestClient):
+    def test_database_error_handling(self, client: TestClient, db_session: Session):
         """Test handling of potential database errors"""
+        # Create admin user and authenticate
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
         # Test with very long username (might exceed database field length)
         long_username = "a" * 1000
         user_data = {"username": long_username, "password": "password123"}
         
-        response = client.post("/auth/create", json=user_data)
+        response = client.post("/auth/create", json=user_data, cookies=admin_cookies)
         # Should handle gracefully, either validation error, database error, or success
         assert response.status_code in [201, 400, 422, 500]
 
@@ -162,10 +176,14 @@ class TestSecurityFeatures:
     
     def test_password_hashing(self, client: TestClient, db_session: Session):
         """Test that passwords are properly hashed"""
+        # Create admin user and authenticate
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
         user_data = {"username": "securityuser", "password": "plainpassword"}
         
         # Create user
-        response = client.post("/auth/create", json=user_data)
+        response = client.post("/auth/create", json=user_data, cookies=admin_cookies)
         assert response.status_code == 201
         
         # Check that password is hashed in database
@@ -189,8 +207,12 @@ class TestSecurityFeatures:
         assert "access_token" in token_data
         assert "refresh_token" in token_data
 
-    def test_injection_protection(self, client: TestClient):
+    def test_injection_protection(self, client: TestClient, db_session: Session):
         """Test protection against injection attacks"""
+        # Create admin user and authenticate
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
         # Test SQL injection attempts
         malicious_usernames = [
             "'; DROP TABLE users; --",
@@ -202,7 +224,7 @@ class TestSecurityFeatures:
             user_data = {"username": malicious_username, "password": "password123"}
             
             # Should not cause errors or security issues
-            create_response = client.post("/auth/create", json=user_data)
+            create_response = client.post("/auth/create", json=user_data, cookies=admin_cookies)
             # Should either succeed or fail gracefully
             assert create_response.status_code in [201, 400, 422]
             
@@ -217,26 +239,17 @@ class TestUserManagementWorkflow:
     
     def test_admin_user_management_workflow(self, client: TestClient, db_session: Session):
         """Test complete workflow: admin login -> get all users -> delete user"""
-        # Step 1: Create admin user
-        admin_data = {"username": "admin", "password": "adminpass123"}
-        admin_response = client.post("/auth/create", json=admin_data)
-        assert admin_response.status_code == 201
+        # Step 1: Create admin user directly in database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
         
-        # Step 2: Create some regular users
+        # Step 2: Admin logs in
+        admin_cookies = authenticate_existing_user(client, "admin", "adminpass123")
+        
+        # Step 3: Admin creates some regular users
         user1_data = {"username": "user1", "password": "pass123"}
         user2_data = {"username": "user2", "password": "pass123"}
-        client.post("/auth/create", json=user1_data)
-        client.post("/auth/create", json=user2_data)
-        
-        # Step 3: Admin login
-        admin_login_response = client.post("/auth/login", data=admin_data)
-        assert admin_login_response.status_code == 200
-        
-        # Extract admin cookies
-        admin_cookies = {}
-        if hasattr(admin_login_response, 'cookies'):
-            for name, value in admin_login_response.cookies.items():
-                admin_cookies[name] = value
+        client.post("/auth/create", json=user1_data, cookies=admin_cookies)
+        client.post("/auth/create", json=user2_data, cookies=admin_cookies)
         
         # Step 4: Admin gets all users
         users_response = client.get("/auth/users", cookies=admin_cookies)
@@ -282,18 +295,11 @@ class TestUserManagementWorkflow:
 
     def test_user_cannot_delete_self(self, client: TestClient, db_session: Session):
         """Test that users cannot delete their own account"""
-        # Create and authenticate user
-        user_data = {"username": "selfdeletetest", "password": "pass123"}
-        client.post("/auth/create", json=user_data)
+        # Create user directly in database (since create endpoint now requires auth)
+        user = create_test_user(db_session, "selfdeletetest", "pass123")
         
-        login_response = client.post("/auth/login", data=user_data)
-        assert login_response.status_code == 200
-        
-        # Extract cookies
-        cookies = {}
-        if hasattr(login_response, 'cookies'):
-            for name, value in login_response.cookies.items():
-                cookies[name] = value
+        # Authenticate user
+        cookies = authenticate_existing_user(client, "selfdeletetest", "pass123")
         
         # Get user info to get their ID
         user_info_response = client.get("/auth/me", cookies=cookies)
@@ -305,34 +311,30 @@ class TestUserManagementWorkflow:
         assert delete_response.status_code == 400
         assert delete_response.json()["detail"] == "Cannot delete your own account"
 
-    def test_mixed_user_operations_workflow(self, client: TestClient):
+    def test_mixed_user_operations_workflow(self, client: TestClient, db_session: Session):
         """Test mixed operations: multiple users, authentication, and management"""
-        # Create multiple users
-        users_data = [
-            {"username": "manager", "password": "pass123"},
+        # Create manager user directly in database
+        manager_user = create_test_user(db_session, "manager", "pass123")
+        
+        # Manager logs in
+        manager_cookies = authenticate_existing_user(client, "manager", "pass123")
+        
+        # Manager creates multiple users
+        employee_users_data = [
             {"username": "employee1", "password": "pass123"},
             {"username": "employee2", "password": "pass123"},
             {"username": "employee3", "password": "pass123"},
         ]
         
-        for user_data in users_data:
-            response = client.post("/auth/create", json=user_data)
+        for user_data in employee_users_data:
+            response = client.post("/auth/create", json=user_data, cookies=manager_cookies)
             assert response.status_code == 201
-        
-        # Manager logs in
-        manager_login = client.post("/auth/login", data=users_data[0])
-        assert manager_login.status_code == 200
-        
-        manager_cookies = {}
-        if hasattr(manager_login, 'cookies'):
-            for name, value in manager_login.cookies.items():
-                manager_cookies[name] = value
         
         # Manager views all users
         all_users_response = client.get("/auth/users", cookies=manager_cookies)
         assert all_users_response.status_code == 200
         all_users = all_users_response.json()
-        assert len(all_users) == 4
+        assert len(all_users) == 4  # manager + 3 employees
         
         # Manager deletes an employee
         employee_to_delete = next(user for user in all_users if user["username"] == "employee2")

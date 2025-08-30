@@ -53,3 +53,18 @@ def create_authenticated_client(client: TestClient, db_session: Session, usernam
             cookies[name] = value
     
     return cookies
+
+
+def authenticate_existing_user(client: TestClient, username: str = "testuser", password: str = "testpass123"):
+    """Authenticate an existing user without creating them, returning cookies for subsequent requests"""
+    # Login to get cookies
+    login_response = authenticate_test_user(client, username, password)
+    assert login_response.status_code == 200
+    
+    # Extract cookies from response - handle httpx response cookies properly
+    cookies = {}
+    if hasattr(login_response, 'cookies'):
+        for name, value in login_response.cookies.items():
+            cookies[name] = value
+    
+    return cookies

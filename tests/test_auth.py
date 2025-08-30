@@ -11,35 +11,70 @@ from tests.test_utils import create_test_user, create_authenticated_client
 class TestUserCreation:
     """Test user creation functionality"""
     
-    def test_create_user_success(self, client: TestClient, sample_user_create_data):
-        """Test successful user creation"""
-        response = client.post("/auth/create", json=sample_user_create_data)
+    def test_create_user_success(self, client: TestClient, db_session: Session, sample_user_create_data):
+        """Test successful user creation with authentication"""
+        # Create an admin user directly in the database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        
+        # Authenticate admin user
+        admin_cookies = create_authenticated_client(client, db_session, "admin", "adminpass123")
+        
+        # Now create a new user using the authenticated admin
+        response = client.post("/auth/create", json=sample_user_create_data, cookies=admin_cookies)
         assert response.status_code == 201
         assert response.json()["message"] == "User created successfully"
         assert response.json()["status"] == 201
 
+    def test_create_user_unauthorized(self, client: TestClient, sample_user_create_data):
+        """Test user creation without authentication"""
+        response = client.post("/auth/create", json=sample_user_create_data)
+        assert response.status_code == 401
+
+    def test_create_user_invalid_token(self, client: TestClient, sample_user_create_data):
+        """Test user creation with invalid token"""
+        response = client.post("/auth/create", json=sample_user_create_data, cookies={"access_token": "invalid_token"})
+        assert response.status_code == 401
+
     def test_create_user_duplicate_username(self, client: TestClient, db_session: Session, sample_user_create_data):
         """Test creating user with duplicate username"""
-        # Create first user
+        # Create an admin user directly in the database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        
+        # Create first user directly in database
         create_test_user(db_session, sample_user_create_data["username"], sample_user_create_data["password"])
         
-        # Try to create user with same username - this might succeed if username is not unique
-        response = client.post("/auth/create", json=sample_user_create_data)
+        # Authenticate admin user
+        admin_cookies = create_authenticated_client(client, db_session, "admin", "adminpass123")
+        
+        # Try to create user with same username
+        response = client.post("/auth/create", json=sample_user_create_data, cookies=admin_cookies)
         # Note: Based on the current model, username might not have unique constraint
         # So this test just verifies the endpoint responds appropriately
         assert response.status_code in [201, 400, 500]  # Could succeed or fail
 
-    def test_create_user_invalid_data(self, client: TestClient):
+    def test_create_user_invalid_data(self, client: TestClient, db_session: Session):
         """Test user creation with invalid data"""
+        # Create an admin user directly in the database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        
+        # Authenticate admin user
+        admin_cookies = create_authenticated_client(client, db_session, "admin", "adminpass123")
+        
         invalid_data = {"username": "", "password": ""}
-        response = client.post("/auth/create", json=invalid_data)
+        response = client.post("/auth/create", json=invalid_data, cookies=admin_cookies)
         # Empty strings might be accepted by Pydantic, check actual response
         assert response.status_code in [201, 422]  # Could succeed or validation error
 
-    def test_create_user_missing_fields(self, client: TestClient):
+    def test_create_user_missing_fields(self, client: TestClient, db_session: Session):
         """Test user creation with missing fields"""
+        # Create an admin user directly in the database
+        admin_user = create_test_user(db_session, "admin", "adminpass123")
+        
+        # Authenticate admin user
+        admin_cookies = create_authenticated_client(client, db_session, "admin", "adminpass123")
+        
         incomplete_data = {"username": "testuser"}
-        response = client.post("/auth/create", json=incomplete_data)
+        response = client.post("/auth/create", json=incomplete_data, cookies=admin_cookies)
         assert response.status_code == 422  # Pydantic validation error
 
 

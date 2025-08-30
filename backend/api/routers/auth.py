@@ -61,7 +61,7 @@ def create_refresh_token(username: str, user_id: int, expires_delta: timedelta) 
 
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, create_user_request: UserCreateRequest):
+async def create_user(current_user: user_dependency, db: db_dependency, create_user_request: UserCreateRequest):
     hashed_password = bcrypt_context.hash(create_user_request.password)
     create_user_model = User(
         username=create_user_request.username, hashed_password=hashed_password
