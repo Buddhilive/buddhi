@@ -2,7 +2,7 @@ from fastapi import Depends
 from backend.api.deps import user_dependency
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -75,6 +75,7 @@ async def create_user(db: db_dependency, create_user_request: UserCreateRequest)
 
 @router.post("/login", response_model=TokenResponse)
 async def login_for_access_token(
+    response: Response,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency
 ):
     user = authenticate_user(form_data.username, form_data.password, db)
@@ -86,6 +87,9 @@ async def login_for_access_token(
         )
     access_token = create_access_token(user.username, user.id, timedelta(minutes=30))
     refresh_token = create_refresh_token(user.username, user.id, timedelta(days=7))
+    # Set tokens as HTTP-only cookies
+    response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=1800, samesite="lax")
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, max_age=604800, samesite="lax")
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -93,7 +97,10 @@ async def login_for_access_token(
     }
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_access_token(refresh_token: str):
+async def refresh_access_token(request: Request, response: Response):
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token cookie missing")
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
@@ -111,6 +118,9 @@ async def refresh_access_token(refresh_token: str):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is blacklisted")
         access_token = create_access_token(username, user_id, timedelta(minutes=30))
         new_refresh_token = create_refresh_token(username, user_id, timedelta(days=7))
+        # Update cookies
+        response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=1800, samesite="lax")
+        response.set_cookie(key="refresh_token", value=new_refresh_token, httponly=True, max_age=604800, samesite="lax")
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
@@ -120,12 +130,13 @@ async def refresh_access_token(refresh_token: str):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
 @router.post("/logout")
-async def logout(refresh_token: str, db: db_dependency):
+async def logout(request: Request, response: Response, db: db_dependency):
     """
-    Blacklist the provided refresh token to prevent future use.
+    Blacklist the provided refresh token to prevent future use and clear cookies.
     """
+    refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refresh token required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refresh token cookie missing")
     # Decode to validate
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -139,6 +150,9 @@ async def logout(refresh_token: str, db: db_dependency):
         new_blacklist = BlacklistedToken(token=refresh_token)
         db.add(new_blacklist)
         db.commit()
+    # Clear cookies
+    response.delete_cookie(key="access_token")
+    response.delete_cookie(key="refresh_token")
     return {"message": "Logged out successfully"}
 
 @router.get("/me", response_model=UserInfoResponse)

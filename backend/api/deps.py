@@ -6,8 +6,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 import os
-
-from .models import User
+from fastapi import Request
 from .database import SessionLocal
 
 load_dotenv()
@@ -25,15 +24,16 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-auth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
-auth2_bearer_dependency = Annotated[str, Depends(auth2_bearer)]
 
-async def get_current_user(token: str = auth2_bearer_dependency) -> User:
+async def get_current_user(request: Request) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    token = request.cookies.get("access_token")
+    if not token:
+        raise credentials_exception
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
