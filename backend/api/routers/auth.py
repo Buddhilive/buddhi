@@ -61,7 +61,7 @@ def create_refresh_token(username: str, user_id: int, expires_delta: timedelta) 
 
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, create_user_request: UserCreateRequest):
+async def create_user(current_user: user_dependency, db: db_dependency, create_user_request: UserCreateRequest):
     hashed_password = bcrypt_context.hash(create_user_request.password)
     create_user_model = User(
         username=create_user_request.username, hashed_password=hashed_password
@@ -198,4 +198,47 @@ async def get_user_info(current_user: user_dependency, db: db_dependency):
         "username": user.username,
         "email": user.email,
         "age": user.age
+    }
+
+
+@router.get("/users", response_model=list[UserInfoResponse])
+async def get_all_users(current_user: user_dependency, db: db_dependency):
+    """Get all users - requires authentication"""
+    users = db.query(User).all()
+    return [
+        {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "age": user.age
+        }
+        for user in users
+    ]
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, current_user: user_dependency, db: db_dependency):
+    """Delete a user by ID - requires authentication"""
+    # Check if user exists
+    user_to_delete = db.query(User).filter(User.id == user_id).first()
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found"
+        )
+    
+    # Prevent users from deleting themselves (optional safety check)
+    if user_id == current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    # Delete the user
+    db.delete(user_to_delete)
+    db.commit()
+    
+    return {
+        "message": f"User {user_to_delete.username} deleted successfully",
+        "status": status.HTTP_200_OK
     }
