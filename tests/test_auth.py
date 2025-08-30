@@ -223,3 +223,132 @@ class TestTokenBlacklisting:
         # Second logout with same token should still work (idempotent)
         response2 = client.post("/auth/logout", cookies=cookies)
         assert response2.status_code == 200
+
+
+class TestGetAllUsers:
+    """Test get all users endpoint"""
+    
+    def test_get_all_users_success(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test successful retrieval of all users"""
+        # Create and authenticate user
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Create additional test users
+        create_test_user(db_session, "user2", "password123")
+        create_test_user(db_session, "user3", "password456")
+        
+        # Get all users
+        response = client.get("/auth/users", cookies=cookies)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 3  # At least 3 users (the authenticated one + 2 additional)
+        
+        # Check that each user has the expected fields
+        for user in data:
+            assert "id" in user
+            assert "username" in user
+            assert "email" in user
+            assert "age" in user
+
+    def test_get_all_users_unauthorized(self, client: TestClient):
+        """Test getting all users without authentication"""
+        response = client.get("/auth/users")
+        assert response.status_code == 401
+
+    def test_get_all_users_invalid_token(self, client: TestClient):
+        """Test getting all users with invalid token"""
+        response = client.get("/auth/users", cookies={"access_token": "invalid_token"})
+        assert response.status_code == 401
+
+    def test_get_all_users_empty_database(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test getting all users when only authenticated user exists"""
+        # Create and authenticate user (this creates one user)
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Get all users
+        response = client.get("/auth/users", cookies=cookies)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1  # Only the authenticated user
+        assert data[0]["username"] == sample_user_data["username"]
+
+
+class TestDeleteUser:
+    """Test delete user endpoint"""
+    
+    def test_delete_user_success(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test successful user deletion"""
+        # Create and authenticate user
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Create another user to delete
+        user_to_delete = create_test_user(db_session, "user_to_delete", "password123")
+        user_id_to_delete = user_to_delete.id
+        
+        # Delete the user
+        response = client.delete(f"/auth/users/{user_id_to_delete}", cookies=cookies)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "message" in data
+        assert "deleted successfully" in data["message"].lower()
+        assert data["status"] == 200
+        
+        # Verify user was actually deleted from database
+        deleted_user = db_session.query(User).filter(User.id == user_id_to_delete).first()
+        assert deleted_user is None
+
+    def test_delete_user_not_found(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test deleting non-existent user"""
+        # Create and authenticate user
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Try to delete non-existent user
+        non_existent_id = 99999
+        response = client.delete(f"/auth/users/{non_existent_id}", cookies=cookies)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "User not found"
+
+    def test_delete_own_account_forbidden(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test that users cannot delete their own account"""
+        # Create and authenticate user
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Get the authenticated user's ID
+        user_info_response = client.get("/auth/me", cookies=cookies)
+        assert user_info_response.status_code == 200
+        current_user_id = user_info_response.json()["id"]
+        
+        # Try to delete own account
+        response = client.delete(f"/auth/users/{current_user_id}", cookies=cookies)
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Cannot delete your own account"
+
+    def test_delete_user_unauthorized(self, client: TestClient, db_session: Session):
+        """Test deleting user without authentication"""
+        # Create a user to attempt deletion
+        user = create_test_user(db_session, "test_user", "password123")
+        
+        response = client.delete(f"/auth/users/{user.id}")
+        assert response.status_code == 401
+
+    def test_delete_user_invalid_token(self, client: TestClient, db_session: Session):
+        """Test deleting user with invalid token"""
+        # Create a user to attempt deletion
+        user = create_test_user(db_session, "test_user", "password123")
+        
+        response = client.delete(f"/auth/users/{user.id}", cookies={"access_token": "invalid_token"})
+        assert response.status_code == 401
+
+    def test_delete_user_invalid_id_format(self, client: TestClient, db_session: Session, sample_user_data):
+        """Test deleting user with invalid ID format"""
+        # Create and authenticate user
+        cookies = create_authenticated_client(client, db_session, sample_user_data["username"], sample_user_data["password"])
+        
+        # Try to delete user with invalid ID format
+        response = client.delete("/auth/users/invalid_id", cookies=cookies)
+        assert response.status_code == 422  # Pydantic validation error
