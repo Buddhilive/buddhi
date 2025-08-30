@@ -32,6 +32,7 @@ import {
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { getUserInfo, logoutUser } from "@/utils/auth-utils";
 
 interface User {
   username: string;
@@ -46,30 +47,16 @@ export function NavUser() {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/me`, {
-          method: "GET",
-          credentials: "include",
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          const newUser: User = {
-            username: userData.username,
-            email: userData.email || userData.username,
-            avatar: userData.avatar || '/next.svg',
-          };
-          setUser(newUser);
-        } else {
-          console.error("Failed to fetch user information:", response.status);
-          // If unauthorized, redirect to login
-          if (response.status === 401) {
-            router.push("/login");
-          }
+      const result = await getUserInfo();
+      
+      if (result.success && result.user) {
+        setUser(result.user);
+      } else {
+        console.error("Failed to fetch user information:", result.error);
+        // If unauthorized, redirect to login
+        if (result.statusCode === 401) {
+          router.push("/login");
         }
-      } catch (error) {
-        console.error("Error fetching user information:", error);
-        router.push("/login");
       }
     };
 
@@ -77,19 +64,12 @@ export function NavUser() {
   }, [router]);
 
   const handleLogout = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        router.push("/login");
-      } else {
-        console.error("Logout failed:", response.status);
-      }
-    } catch (error) {
-      console.error("Logout error:", error);
+    const result = await logoutUser();
+    
+    if (result.success) {
+      router.push("/login");
+    } else {
+      console.error("Logout failed:", result.error);
     }
   };
 

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { loginUser } from "@/utils/auth-utils";
 
 type FormData = {
   username: string;
@@ -26,49 +27,19 @@ export function LoginForm({
     e.preventDefault();
     setLoading(true);
     setError("");
-    try {
-      // Use client-side fetch instead of server action
-      const body = new URLSearchParams();
-      body.append("username", formData.username);
-      body.append("password", formData.password);
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: body.toString(),
-        credentials: "include",
-      });
-      
-      const data = await response.json();
-      console.log("=== LOGIN DEBUG ===");
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
-      console.log("Response data:", data);
-      console.log("All response headers:");
-      for (let [key, value] of response.headers.entries()) {
-        console.log(`  ${key}: ${value}`);
-      }
-      console.log("==================");
-      
-      if (response.ok) {
-        console.log("Login successful, redirecting to dashboard");
-        console.log("Document cookies after login:", document.cookie);
-        // Wait a bit for cookies to be set
-        setTimeout(() => {
-          console.log("Document cookies after timeout:", document.cookie);
-          router.push("/dashboard");
-        }, 100);
-      } else {
-        setError(data?.detail || "Login failed");
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("Network error occurred");
-    } finally {
-      setLoading(false);
+
+    const result = await loginUser(formData);
+
+    if (result.success) {
+      // Wait a bit for cookies to be set
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 100);
+    } else {
+      setError(result.error || "Login failed");
     }
+
+    setLoading(false);
   }
 
   return (
@@ -99,12 +70,12 @@ export function LoginForm({
         <div className="grid gap-3">
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
-            <Link
+            {/* <Link
               href="/forgot-password"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
               Forgot your password?
-            </Link>
+            </Link> */}
           </div>
           <Input
             id="password"
@@ -119,11 +90,16 @@ export function LoginForm({
           {loading ? "Signing in..." : "Sign in"}
         </Button>
       </div>
+      {error && (
+        <div className="text-center">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
       <div className="text-center">
-        <span className="text-gray-600">Don't have an account? </span>
+        {/* <span className="text-gray-600">Don't have an account? </span>
         <Link href="/register" className="text-blue-600 hover:text-blue-500">
           Sign up
-        </Link>
+        </Link> */}
       </div>
     </form>
   );
