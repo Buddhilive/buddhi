@@ -22,22 +22,22 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 ### Creating a Python Virtual Environment
 
-To create a Python virtual environment named `dojo`, run the following command in your terminal:
+To create a Python virtual environment named `.venv`, run the following command in your terminal:
 
 ```shell
-python -m venv dojo
+python -m venv .venv
 ```
 
 To activate the environment on Windows, use:
 
 ```shell
-.\dojo\Scripts\activate
+.\.venv\Scripts\activate
 ```
 
 On macOS/Linux, use:
 
 ```bash
-source dojo/bin/activate
+source .venv/bin/activate
 ```
 
 ### Install Dependencies
@@ -50,8 +50,16 @@ pip install -r requirements.txt
 
 ### Run backend app
 
-To run the FastAPI backend app, use the following command:
+To run the FastAPI backend app:
+
+run the `runserver.bat` file on Windows:
+
+```bash
+.\runserver.bat
+```
+
+run the `runserver.sh` file on macOS/Linux:
 
 ```shell
-uvicorn api.main:app --reload
+./runserver.sh
 ```
