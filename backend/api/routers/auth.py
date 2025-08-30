@@ -1,3 +1,5 @@
+from fastapi import Depends
+from backend.api.deps import user_dependency
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -27,6 +29,12 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
+class UserInfoResponse(BaseModel):
+    id: int
+    username: str
+    email: str | None = None
+    age: int | None = None
 
 
 def authenticate_user(username: str, password: str, db) -> User | None:
@@ -132,3 +140,15 @@ async def logout(refresh_token: str, db: db_dependency):
         db.add(new_blacklist)
         db.commit()
     return {"message": "Logged out successfully"}
+
+@router.get("/me", response_model=UserInfoResponse)
+async def get_user_info(current_user: user_dependency, db: db_dependency):
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "age": user.age
+    }
