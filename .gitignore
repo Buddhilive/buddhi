@@ -43,5 +43,6 @@ next-env.d.ts
 # python
 __pycache__/
 *.py[cod]
-dojo/
+.venv/
 *.sqlite3
+*.db

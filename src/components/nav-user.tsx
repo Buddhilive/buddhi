@@ -31,8 +31,8 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useRouter } from "next/navigation";
-import { logoutUser, getUserInfo } from "@/utils/auth";
 import { useState, useEffect } from "react";
+import { getUserInfo, logoutUser } from "@/utils/auth-utils";
 
 interface User {
   username: string;
@@ -47,26 +47,16 @@ export function NavUser() {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      try {
-        const response = await getUserInfo();
-        if (response.ok) {
-          const body = await response.json();
-          const newUser: User = {
-            username: body.data.email,
-            email: body.data.email,
-            avatar: body.data.avatar || 'next.svg',
-          };
-          setUser(newUser);
-        } else {
-          console.error("Failed to fetch user information:", response.status);
-          // If unauthorized, redirect to login
-          if (response.status === 401) {
-            router.push("/login");
-          }
+      const result = await getUserInfo();
+      
+      if (result.success && result.user) {
+        setUser(result.user);
+      } else {
+        console.error("Failed to fetch user information:", result.error);
+        // If unauthorized, redirect to login
+        if (result.statusCode === 401) {
+          router.push("/login");
         }
-      } catch (error) {
-        console.error("Error fetching user information:", error);
-        router.push("/login");
       }
     };
 
@@ -74,15 +64,12 @@ export function NavUser() {
   }, [router]);
 
   const handleLogout = async () => {
-    try {
-      const response = await logoutUser();
-      if (response.ok) {
-        router.push("/login");
-      } else {
-        console.error("Logout failed:", response.status);
-      }
-    } catch (error) {
-      console.error("Logout error:", error);
+    const result = await logoutUser();
+    
+    if (result.success) {
+      router.push("/login");
+    } else {
+      console.error("Logout failed:", result.error);
     }
   };
 
@@ -96,7 +83,7 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={"/avatars/default.jpg"} alt={user?.username} />
+                <AvatarImage src={user?.avatar} alt={user?.username} />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
