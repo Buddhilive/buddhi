@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginUser } from "@/app/actions/auth-actions";
 
 type FormData = {
   username: string;
@@ -28,14 +27,44 @@ export function LoginForm({
     setLoading(true);
     setError("");
     try {
-      const result = await loginUser(formData.username, formData.password);
-      console.log("Login result:", result);
-      if (result && result.success) {
-        router.push("/dashboard");
+      // Use client-side fetch instead of server action
+      const body = new URLSearchParams();
+      body.append("username", formData.username);
+      body.append("password", formData.password);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+        credentials: "include",
+      });
+      
+      const data = await response.json();
+      console.log("=== LOGIN DEBUG ===");
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+      console.log("Response data:", data);
+      console.log("All response headers:");
+      for (let [key, value] of response.headers.entries()) {
+        console.log(`  ${key}: ${value}`);
+      }
+      console.log("==================");
+      
+      if (response.ok) {
+        console.log("Login successful, redirecting to dashboard");
+        console.log("Document cookies after login:", document.cookie);
+        // Wait a bit for cookies to be set
+        setTimeout(() => {
+          console.log("Document cookies after timeout:", document.cookie);
+          router.push("/dashboard");
+        }, 100);
       } else {
-        setError(result?.message || "Login failed");
+        setError(data?.detail || "Login failed");
       }
     } catch (err) {
+      console.error("Login error:", err);
       setError("Network error occurred");
     } finally {
       setLoading(false);

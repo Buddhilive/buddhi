@@ -1,7 +1,7 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, Table, DateTime
 from sqlalchemy.orm import relationship
-from ..api.database import Base
-from datetime import datetime
+from backend.api.database import Base
+from datetime import datetime, timezone
 
 class User(Base):
     __tablename__ = "users"
@@ -17,4 +17,4 @@ class BlacklistedToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True, nullable=False)
-    blacklisted_on = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))
+    blacklisted_on = Column(DateTime, default=lambda: datetime.now(timezone.utc))

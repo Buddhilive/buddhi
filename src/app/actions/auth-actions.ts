@@ -1,7 +1,7 @@
 "use server";
 
 const FASTAPI_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 export async function registerUser(username: string, password: string) {
   try {
@@ -24,7 +24,8 @@ export async function registerUser(username: string, password: string) {
 }
 
 export async function loginUser(username: string, password: string) {
-  console.log("Logging in user:", FASTAPI_BASE_URL);
+  console.log("Logging in user with URL:", FASTAPI_BASE_URL);
+  console.log("Environment variable:", process.env.NEXT_PUBLIC_API_BASE_URL);
   const body = new URLSearchParams();
   body.append("username", username);
   body.append("password", password);
@@ -38,6 +39,9 @@ export async function loginUser(username: string, password: string) {
       credentials: "include",
     });
     const data = await response.json();
+    console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+    console.log("Response data:", data);
     if (!response.ok) {
       // Optionally pass FastAPI error message to frontend
       return { success: false, message: data?.detail || `HTTP error! status: ${response.status}` };

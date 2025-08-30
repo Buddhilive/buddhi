@@ -86,9 +86,29 @@ async def login_for_access_token(
         )
     access_token = create_access_token(user.username, user.id, timedelta(minutes=30))
     refresh_token = create_refresh_token(user.username, user.id, timedelta(days=7))
-    # Set tokens as HTTP-only cookies
-    response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=1800, samesite="lax")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, max_age=604800, samesite="lax")
+    
+    # Set tokens as HTTP-only cookies with proper cross-origin settings
+    response.set_cookie(
+        key="access_token", 
+        value=access_token, 
+        httponly=True, 
+        max_age=1800, 
+        samesite="lax",
+        secure=False,  # Set to True in production with HTTPS
+        domain=None,  # Let browser decide
+        path="/"
+    )
+    response.set_cookie(
+        key="refresh_token", 
+        value=refresh_token, 
+        httponly=True, 
+        max_age=604800, 
+        samesite="lax",
+        secure=False,  # Set to True in production with HTTPS
+        domain=None,  # Let browser decide
+        path="/"
+    )
+    
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -117,9 +137,23 @@ async def refresh_access_token(request: Request, response: Response):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is blacklisted")
         access_token = create_access_token(username, user_id, timedelta(minutes=30))
         new_refresh_token = create_refresh_token(username, user_id, timedelta(days=7))
-        # Update cookies
-        response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=1800, samesite="lax")
-        response.set_cookie(key="refresh_token", value=new_refresh_token, httponly=True, max_age=604800, samesite="lax")
+        # Update cookies with proper cross-origin settings
+        response.set_cookie(
+            key="access_token", 
+            value=access_token, 
+            httponly=True, 
+            max_age=1800, 
+            samesite="lax",
+            secure=False  # Set to True in production with HTTPS
+        )
+        response.set_cookie(
+            key="refresh_token", 
+            value=new_refresh_token, 
+            httponly=True, 
+            max_age=604800, 
+            samesite="lax",
+            secure=False  # Set to True in production with HTTPS
+        )
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,

@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useRouter } from "next/navigation";
-import { logoutUser, getUserInfo } from "@/app/actions/auth-actions";
 import { useState, useEffect } from "react";
 
 interface User {
@@ -48,18 +47,23 @@ export function NavUser() {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const body = await getUserInfo();
-        if (body && body.success) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/me`, {
+          method: "GET",
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
           const newUser: User = {
-            username: body.data.email,
-            email: body.data.email,
-            avatar: body.data.avatar || 'next.svg',
+            username: userData.username,
+            email: userData.email || userData.username,
+            avatar: userData.avatar || '/next.svg',
           };
           setUser(newUser);
         } else {
-          console.error("Failed to fetch user information:", body?.message);
+          console.error("Failed to fetch user information:", response.status);
           // If unauthorized, redirect to login
-          if (body?.status === 401) {
+          if (response.status === 401) {
             router.push("/login");
           }
         }
@@ -74,11 +78,15 @@ export function NavUser() {
 
   const handleLogout = async () => {
     try {
-      const result = await logoutUser();
-      if (result && result.success) {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      
+      if (response.ok) {
         router.push("/login");
       } else {
-        console.error("Logout failed:", result?.message);
+        console.error("Logout failed:", response.status);
       }
     } catch (error) {
       console.error("Logout error:", error);
@@ -95,7 +103,7 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={"/avatars/default.jpg"} alt={user?.username} />
+                <AvatarImage src={user?.avatar} alt={user?.username} />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
