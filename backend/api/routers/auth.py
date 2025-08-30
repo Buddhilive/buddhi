@@ -8,9 +8,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 import os
-from backend.api.models import User
+from backend.models.base import User, BlacklistedToken
 from backend.api.deps import db_dependency, bcrypt_context
-from backend.api.blacklist import BlacklistedToken
 
 load_dotenv()
 
