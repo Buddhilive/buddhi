@@ -17,4 +17,4 @@ class BlacklistedToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True, nullable=False)
-    blacklisted_on = Column(DateTime, default=datetime.utcnow)
+    blacklisted_on = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))

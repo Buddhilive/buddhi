@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useRouter } from "next/navigation";
-import { logoutUser, getUserInfo } from "@/utils/auth";
+import { logoutUser, getUserInfo } from "@/app/actions/auth-actions";
 import { useState, useEffect } from "react";
 
 interface User {
@@ -48,9 +48,8 @@ export function NavUser() {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const response = await getUserInfo();
-        if (response.ok) {
-          const body = await response.json();
+        const body = await getUserInfo();
+        if (body && body.success) {
           const newUser: User = {
             username: body.data.email,
             email: body.data.email,
@@ -58,9 +57,9 @@ export function NavUser() {
           };
           setUser(newUser);
         } else {
-          console.error("Failed to fetch user information:", response.status);
+          console.error("Failed to fetch user information:", body?.message);
           // If unauthorized, redirect to login
-          if (response.status === 401) {
+          if (body?.status === 401) {
             router.push("/login");
           }
         }
@@ -75,11 +74,11 @@ export function NavUser() {
 
   const handleLogout = async () => {
     try {
-      const response = await logoutUser();
-      if (response.ok) {
+      const result = await logoutUser();
+      if (result && result.success) {
         router.push("/login");
       } else {
-        console.error("Logout failed:", response.status);
+        console.error("Logout failed:", result?.message);
       }
     } catch (error) {
       console.error("Logout error:", error);

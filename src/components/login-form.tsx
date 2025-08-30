@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginUser } from "@/utils/auth";
+import { loginUser } from "@/app/actions/auth-actions";
 
 type FormData = {
-  email: string;
+  username: string;
   password: string;
 };
 
@@ -18,31 +18,29 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
-      const response = await loginUser(formData.email, formData.password);
-      console.log("Login response:", response);
-      if (response.ok) {
+      const result = await loginUser(formData.username, formData.password);
+      console.log("Login result:", result);
+      if (result && result.success) {
         router.push("/dashboard");
       } else {
-        setError("Login failed");
-        console.error("Login error:", response);
+        setError(result?.message || "Login failed");
       }
     } catch (err) {
       setError("Network error occurred");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <form
@@ -58,14 +56,14 @@ export function LoginForm({
       </div>
       <div className="grid gap-6">
         <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="username">Username</Label>
           <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            value={formData.email}
+            id="username"
+            type="text"
+            placeholder="your username"
+            value={formData.username}
             onChange={(e) =>
-              setFormData({ ...formData, email: e.target.value })
+              setFormData({ ...formData, username: e.target.value })
             }
           />
         </div>
