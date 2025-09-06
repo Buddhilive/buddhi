@@ -25,5 +25,3 @@ def health_check():
 
 # Include routers
 app.include_router(auth.router)
-app.include_router(model_management.router)
-app.include_router(openai.router)
