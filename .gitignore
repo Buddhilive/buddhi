@@ -19,6 +19,7 @@
 
 # production
 /build
+**/temp
 
 # misc
 .DS_Store
@@ -46,3 +47,4 @@ __pycache__/
 .venv/
 *.sqlite3
 *.db
+.pytest_cache/
