@@ -1,15 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
-from .routers import auth, model_management, openai
+from .routers import auth
+from .initial_user import create_default_user
 
 app = FastAPI(
     title="Buddhi AI",
-    description="AI Model Orchestration Service with OpenAI-compatible API",
-    version="1.0.0"
+    description="AI Model Orchestration Service",
+    version="0.1.0"
 )
 
 Base.metadata.create_all(bind=engine)
+
+# Create default user
+create_default_user()
 
 app.add_middleware(
     CORSMiddleware,
