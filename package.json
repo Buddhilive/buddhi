@@ -3,15 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "install-reqs": "pnpm install && pip3 install -r core/requirements.txt",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "export": "next export"
+    "export": "next export",
+    "build:sidecar-winos": "pyinstaller -c -F --clean --name buddhi-x86_64-pc-windows-msvc --distpath src-tauri/bin/api core/main.py",
+    "build:sidecar-macos": "pyinstaller -c -F --clean --name buddhi-aarch64-apple-darwin --distpath src-tauri/bin/api core/main.py",
+    "build:sidecar-linux": "pyinstaller -c -F --clean --name buddhi-x86_64-unknown-linux-gnu --distpath src-tauri/bin/api core/main.py",
+    "build:icons": "pnpm tauri icon public/logos/app-icon.png"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-http": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-shell": "^2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "next": "15.5.4"
