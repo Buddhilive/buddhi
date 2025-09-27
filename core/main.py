@@ -3,10 +3,12 @@ import signal
 import sys
 import asyncio
 import threading
-from typing import TypedDict
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn import Config, Server
+from fastapi.staticfiles import StaticFiles
+
+from routers import completions
 
 PORT_API = 8008
 
@@ -17,6 +19,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # Configure CORS settings
 origins = [
     "*",  # to whitelist any url, REMOVE THIS FOR PRODUCTION!!!
@@ -47,16 +50,8 @@ def connect_to_api_server():
         },
     }
 
-
-class T_Query(TypedDict):
-    name: str
-
-
-# Mock text inference endpoint, here for inspiration.
-@app.post("/v1/completions")
-def llm_completion(payload: T_Query = Body(...)):
-    return {"message": f"Namo Buddhaya!, {payload['name']} from FastAPI!"}
-
+# Include Routers
+app.include_router(completions.router)
 
 # Programmatically force shutdown this sidecar.
 def kill_process():
