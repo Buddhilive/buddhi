@@ -15,7 +15,7 @@ PORT_API = 8008
 server_instance = None  # Global reference to the Uvicorn server instance
 
 app = FastAPI(
-    title="API server",
+    title="Buddhi AI API server",
     version="0.1.0",
 )
 
@@ -37,8 +37,11 @@ app.add_middleware(
 
 # Tell client we are ready to accept requests.
 # This is a mock func, modify to your needs.
-@app.get("/v1/connect")
+@app.get("/health")
 def connect_to_api_server():
+    """
+    Check API Server health.
+    """
     print("[server] Connecting to server...", flush=True)
     host = f"http://localhost:{PORT_API}"
     return {
