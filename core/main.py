@@ -20,7 +20,22 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# --- Determine the base path for bundled files ---
+# This is the directory where PyInstaller unpacked the files at runtime.
+if getattr(sys, 'frozen', False):
+    # Running inside a PyInstaller bundle
+    BUNDLE_DIR = sys._MEIPASS
+else:
+    # Running as a regular Python script (for development)
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- Construct the absolute path to the static folder ---
+STATIC_FILES_DIR = os.path.join(BUNDLE_DIR, 'static')
+
+# --- Initialize StaticFiles with the correct path ---
+# Ensure 'app' is your FastAPI instance
+app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")
+
 # Configure CORS settings
 origins = [
     "*",  # to whitelist any url, REMOVE THIS FOR PRODUCTION!!!

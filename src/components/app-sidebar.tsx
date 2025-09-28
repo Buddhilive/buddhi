@@ -5,7 +5,6 @@ import {
   Command,
   Home,
   LibraryBig,
-  MessageCircleQuestion,
   Settings2,
   Sparkles,
 } from "lucide-react"

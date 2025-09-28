@@ -2,6 +2,7 @@ from typing import Annotated, Any, List, Literal, Optional, Union
 from pydantic import BaseModel, BeforeValidator, Field
 from fastapi import APIRouter, HTTPException, Depends, status
 import torch
+from sentence_transformers import SentenceTransformer
 
 # --- Pydantic Schemas (from OpenAPI Specification) ---
 
@@ -75,7 +76,6 @@ def load_model():
     """Load the SentenceTransformer model from the specified path."""
     global S_MODEL
     try:
-        from sentence_transformers import SentenceTransformer
         print(f"Loading SentenceTransformer model from: {MODEL_PATH}...")
         
         # NOTE: Using SentenceTransformer to load the downloaded model
