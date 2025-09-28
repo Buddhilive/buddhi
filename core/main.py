@@ -3,20 +3,24 @@ import signal
 import sys
 import asyncio
 import threading
-from typing import TypedDict
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn import Config, Server
+from fastapi.staticfiles import StaticFiles
+
+from routers import embeddings
+from routers import completions
 
 PORT_API = 8008
 
 server_instance = None  # Global reference to the Uvicorn server instance
 
 app = FastAPI(
-    title="API server",
+    title="Buddhi AI API server",
     version="0.1.0",
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # Configure CORS settings
 origins = [
     "*",  # to whitelist any url, REMOVE THIS FOR PRODUCTION!!!
@@ -31,11 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Preload the models
+embeddings.load_model()
+completions.load_model()
 
 # Tell client we are ready to accept requests.
 # This is a mock func, modify to your needs.
-@app.get("/v1/connect")
+@app.get("/health")
 def connect_to_api_server():
+    """
+    Check API Server health.
+    """
     print("[server] Connecting to server...", flush=True)
     host = f"http://localhost:{PORT_API}"
     return {
@@ -47,16 +57,9 @@ def connect_to_api_server():
         },
     }
 
-
-class T_Query(TypedDict):
-    name: str
-
-
-# Mock text inference endpoint, here for inspiration.
-@app.post("/v1/completions")
-def llm_completion(payload: T_Query = Body(...)):
-    return {"message": f"Namo Buddhaya!, {payload['name']} from FastAPI!"}
-
+# Include Routers
+app.include_router(completions.COMPLETIONS_ROUTER)
+app.include_router(embeddings.EMBEDDING_ROUTER)
 
 # Programmatically force shutdown this sidecar.
 def kill_process():
