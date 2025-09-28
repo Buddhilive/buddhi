@@ -204,8 +204,7 @@ export default function ChatPage() {
           </button>
         </div>
         <div className="text-xs text-muted-foreground mt-2 text-center">
-          AI Assistant may produce inaccurate information about people, places,
-          or facts.
+          Buddhi AI can make mistakes, so double-check it.
         </div>
       </div>
     </div>

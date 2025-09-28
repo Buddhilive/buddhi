@@ -2,23 +2,18 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
-  Blocks,
-  Calendar,
   Command,
   Home,
-  Inbox,
+  LibraryBig,
   MessageCircleQuestion,
-  Search,
   Settings2,
   Sparkles,
-  Trash2,
 } from "lucide-react"
 
 import { NavFavorites } from "@/components/nav-favorites"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
-import { NavWorkspaces } from "@/components/nav-workspaces"
+/* import { NavWorkspaces } from "@/components/nav-workspaces" */
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
@@ -48,10 +43,9 @@ const data = {
       icon: Sparkles
     },
     {
-      title: "Inbox",
-      url: "#",
-      icon: Inbox,
-      badge: "10",
+      title: "Library",
+      url: "/library",
+      icon: LibraryBig,
     },
   ],
   navSecondary: [
@@ -97,7 +91,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavFavorites favorites={data.favorites} />
-        <NavWorkspaces workspaces={data.workspaces} />
+        {/* <NavWorkspaces workspaces={data.workspaces} /> */}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarRail />
