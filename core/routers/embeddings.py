@@ -1,7 +1,8 @@
-from typing import List, Literal, Optional, Union
-from pydantic import BaseModel, Field, conlist
+from typing import Annotated, List, Literal, Optional, Union
+from pydantic import BaseModel, BeforeValidator, Field
 from fastapi import APIRouter, HTTPException, Depends, status
 import torch
+from transformers import Any
 
 # --- Pydantic Schemas (from OpenAPI Specification) ---
 
@@ -18,10 +19,27 @@ class Embedding(BaseModel):
     # FIX: Replaced Field(..., const=True) with Literal["embedding"] for Pydantic V2
     object: Literal["embedding"] = "embedding" 
 
+# Helper function to ensure single string input is converted to a list
+def ensure_list_for_input(v: Any) -> Any:
+    """Ensure the input field is a list if it's a single string."""
+    if isinstance(v, str):
+        return [v]
+    return v
+
+# Define the constrained list type using Annotated
+# This type now requires the list to contain strings and have a minimum length of 1.
+ConstrainedStringList = Annotated[
+    List[str], 
+    Field(min_length=1)
+]
+
 # Request Schema (No change needed here, as it didn't use const=True)
 class CreateEmbeddingRequest(BaseModel):
     """Request payload for creating embeddings."""
-    input: Union[str, conlist(str, min_length=1)] = Field(..., description="Input text to embed...")
+    input: Annotated[
+        Union[str, ConstrainedStringList],
+        BeforeValidator(ensure_list_for_input)
+    ] = Field(..., description="Input text to embed, encoded as a string or array of strings.")
     model: str = Field(..., description="ID of the model to use.")
     encoding_format: Optional[str] = Field("float", pattern="^(float|base64)$", description="The format to return the embeddings in.")
     user: Optional[str] = Field(None, description="A unique identifier representing your end-user.")
