@@ -1,3 +1,3 @@
-![Buddhi AI Logo](./public/logos/buddhi-ai-logo-64.png)
+![Buddhi AI Logo](./public/logos/app-icon.png)
 
 # Buddhi AI - Your Private AI
