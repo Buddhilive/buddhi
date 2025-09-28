@@ -35,6 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Preload the models
+embeddings.load_model()
+completions.load_model()
 
 # Tell client we are ready to accept requests.
 # This is a mock func, modify to your needs.

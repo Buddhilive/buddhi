@@ -11,24 +11,24 @@ COMPLETIONS_ROUTER = APIRouter(prefix="/v1", tags=["llm"])
 model_path = "static/models/gemma-3-270m-it"
 current_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-print(f"Current device: {current_device}")
+pipe = None
 
 # Load the HuggingFace pipeline once when the application starts
-# NOTE: Moving this outside the endpoint function is CRITICAL for performance.
-# In a real FastAPI app, you would use lifespan events or global state.
-try:
-    # Use torch.bfloat16 only if the device and model support it
-    pipe = pipeline(
-        "text-generation",
-        model=model_path,
-        device=current_device, # Use "cuda" if a GPU is available
-        dtype=torch.bfloat16 # Use torch.float32 if bfloat16 is not supported
-    )
-    print(f"HuggingFace Pipeline loaded successfully with model: {model_path}")
-except Exception as e:
-    # If model loading fails, the API should not start or should return 500
-    print(f"Error loading model: {e}")
-    pipe = None 
+def load_model():
+    try:
+        global pipe
+        # Use torch.bfloat16 only if the device and model support it
+        pipe = pipeline(
+            "text-generation",
+            model=model_path,
+            device=current_device, # Use "cuda" if a GPU is available
+            dtype=torch.bfloat16 # Use torch.float32 if bfloat16 is not supported
+        )
+        print(f"HuggingFace Pipeline loaded successfully with model: {model_path}")
+    except Exception as e:
+        # If model loading fails, the API should not start or should return 500
+        print(f"Error loading model: {e}")
+        pipe = None 
 
 
 # --- Pydantic Models for OpenAI Chat Completions Standard ---

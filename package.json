@@ -9,9 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "export": "next export",
-    "build:sidecar-winos": "pyinstaller -c -F --clean --name buddhi-x86_64-pc-windows-msvc --distpath src-tauri/bin/api core/main.py",
-    "build:sidecar-macos": "pyinstaller -c -F --clean --name buddhi-aarch64-apple-darwin --distpath src-tauri/bin/api core/main.py",
-    "build:sidecar-linux": "pyinstaller -c -F --clean --name buddhi-x86_64-unknown-linux-gnu --distpath src-tauri/bin/api core/main.py",
+    "build:sidecar-winos": "pyinstaller -c -F --clean --name buddhi-x86_64-pc-windows-msvc --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\"",
+    "build:sidecar-macos": "pyinstaller -c -F --clean --name buddhi-aarch64-apple-darwin --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\"",
+    "build:sidecar-linux": "pyinstaller -c -F --clean --name buddhi-x86_64-unknown-linux-gnu --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\"",
     "build:icons": "pnpm tauri icon public/logos/app-icon.png"
   },
   "dependencies": {

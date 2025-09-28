@@ -1,8 +1,7 @@
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Any, List, Literal, Optional, Union
 from pydantic import BaseModel, BeforeValidator, Field
 from fastapi import APIRouter, HTTPException, Depends, status
 import torch
-from transformers import Any
 
 # --- Pydantic Schemas (from OpenAPI Specification) ---
 
@@ -91,7 +90,7 @@ def load_model():
         raise RuntimeError(f"Failed to load model from path: {MODEL_PATH}")
 
 # Call model loading function at startup (can be done in main app startup event)
-load_model()
+# load_model()
 
 # Dependency to ensure the model is loaded before processing requests
 def get_model():
