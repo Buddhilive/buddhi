@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from uvicorn import Config, Server
 from fastapi.staticfiles import StaticFiles
 
+from routers import embeddings
 from routers import completions
 
 PORT_API = 8008
@@ -54,7 +55,8 @@ def connect_to_api_server():
     }
 
 # Include Routers
-app.include_router(completions.router)
+app.include_router(completions.COMPLETIONS_ROUTER)
+app.include_router(embeddings.EMBEDDING_ROUTER)
 
 # Programmatically force shutdown this sidecar.
 def kill_process():

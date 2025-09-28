@@ -7,7 +7,7 @@ from transformers import pipeline
 import torch
 import uuid
 
-router = APIRouter(prefix="/v1", tags=["llm"])
+COMPLETIONS_ROUTER = APIRouter(prefix="/v1", tags=["llm"])
 model_path = "static/models/gemma-3-270m-it"
 current_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -96,7 +96,7 @@ class ChatCompletionResponse(BaseModel):
 
 # --- Standardized Chat Completion Endpoint ---
 
-@router.post("/chat/completions", response_model=ChatCompletionResponse)
+@COMPLETIONS_ROUTER.post("/chat/completions", response_model=ChatCompletionResponse)
 async def create_chat_completion(
     payload: CreateChatCompletionRequest
 ):
