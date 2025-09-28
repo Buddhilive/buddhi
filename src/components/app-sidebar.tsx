@@ -38,15 +38,14 @@ const data = {
   ],
   navMain: [
     {
-      title: "Ask AI",
-      url: "#",
-      icon: Sparkles,
-      isActive: true,
+      title: "Home",
+      url: "/",
+      icon: Home
     },
     {
-      title: "Home",
-      url: "#",
-      icon: Home
+      title: "Ask AI",
+      url: "/chat",
+      icon: Sparkles
     },
     {
       title: "Inbox",
