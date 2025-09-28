@@ -1,25 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-
-interface Message {
-  id: string;
-  content: string;
-  role: "user" | "assistant";
-  timestamp: Date;
-}
+import { useEffect, useRef } from "react";
+import { useChatStore } from "@/stores/chatStore";
+import { chatApi } from "@/lib/api";
+import { Message } from "@/types/chat";
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: "Hello! How can I assist you today?",
-      role: "assistant",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    messages,
+    isLoading,
+    error,
+    inputValue,
+    setInputValue,
+    addMessage,
+    setIsLoading,
+    setError,
+  } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to the latest message when messages change
@@ -31,7 +27,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputValue.trim() === "") return;
 
     // Add user message
@@ -42,22 +38,71 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMessage);
     setInputValue("");
     setIsLoading(true);
+    setError(null); // Clear any previous errors
 
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content:
-          "This is a simulated response from the AI assistant. In a real implementation, this would connect to an AI service.",
-        role: "assistant",
-        timestamp: new Date(),
+    try {
+      // Transform messages for API request (only include content that is not null)
+      const systemMessage: Message = {
+        role: "system",
+        content: "You are a helpful assistant.",
       };
-      setMessages((prev) => [...prev, aiMessage]);
+
+      const apiMessages = [
+        systemMessage,
+        ...messages
+          .filter((msg) => msg.content !== null) // Filter out messages with null content
+          .map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          })),
+      ];
+
+      // Add the new user message to the API request
+      apiMessages.push({
+        role: "user",
+        content: userMessage.content,
+      });
+
+      // Call the API
+      const response = await chatApi.getCompletion({
+        model: "gemma-3-270m-it", // Use the appropriate model name
+        messages: apiMessages,
+        temperature: 1.0,
+        max_tokens: 500,
+      });
+
+      // Extract the assistant's response
+      if (response.choices && response.choices.length > 0) {
+        const assistantMessageContent = response.choices[0].message.content;
+
+        if (assistantMessageContent) {
+          const aiMessage: Message = {
+            id: `ai-${Date.now()}`,
+            content: assistantMessageContent,
+            role: "assistant",
+            timestamp: new Date(),
+          };
+
+          addMessage(aiMessage);
+        } else {
+          throw new Error("Received empty response from AI model");
+        }
+      } else {
+        throw new Error("No choices returned from AI model");
+      }
+    } catch (err) {
+      console.error("Error getting AI response:", err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "An error occurred while getting response";
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -71,6 +116,13 @@ export default function ChatPage() {
     <div className="flex flex-col h-[calc(100vh-56px)] max-h-[calc(100vh-56px)] overflow-hidden">
       {/* Chat messages area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 flex-grow">
+        {error && (
+          <div className="flex justify-start">
+            <div className="bg-destructive text-destructive-foreground rounded-xl rounded-bl-none px-4 py-2 max-w-[80%]">
+              <div className="text-sm">Error: {error}</div>
+            </div>
+          </div>
+        )}
         {messages.map((message) => (
           <div
             key={message.id}
@@ -93,10 +145,11 @@ export default function ChatPage() {
                     : "text-secondary-foreground/70"
                 }`}
               >
-                {message.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {message.timestamp &&
+                  message.timestamp.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
               </div>
             </div>
           </div>
