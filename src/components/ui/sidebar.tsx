@@ -54,7 +54,7 @@ function useSidebar() {
 }
 
 function SidebarProvider({
-  defaultOpen = false,
+  defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -266,6 +266,7 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
+      title="Toggle Sidebar"
       className={cn("size-7", className)}
       onClick={(event) => {
         onClick?.(event)
