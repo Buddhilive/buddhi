@@ -7,8 +7,22 @@ from transformers import pipeline
 import torch
 import uuid
 
+import os
+import sys
+
 COMPLETIONS_ROUTER = APIRouter(prefix="/v1", tags=["llm"])
-model_path = "static/models/gemma-3-270m-it"
+
+# --- Determine the base path for bundled files ---
+# This is the directory where PyInstaller unpacked the files at runtime.
+if getattr(sys, 'frozen', False):
+    # Running inside a PyInstaller bundle
+    BUNDLE_DIR = sys._MEIPASS
+else:
+    # Running as a regular Python script (for development)
+    BUNDLE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# --- Construct the absolute path to the model ---
+model_path = os.path.join(BUNDLE_DIR, 'static', 'models', 'gemma-3-270m-it')
 current_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 pipe = None
@@ -17,12 +31,19 @@ pipe = None
 def load_model():
     try:
         global pipe
+        # Check if the model path exists locally
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model directory not found: {model_path}")
+        
+        print(f"Loading model from local path: {model_path}")
+        
         # Use torch.bfloat16 only if the device and model support it
         pipe = pipeline(
             "text-generation",
             model=model_path,
             device=current_device, # Use "cuda" if a GPU is available
-            dtype=torch.bfloat16 # Use torch.float32 if bfloat16 is not supported
+            dtype=torch.bfloat16, # Use torch.float32 if bfloat16 is not supported
+            local_files_only=True  # Force using local files only, don't try to download from Hub
         )
         print(f"HuggingFace Pipeline loaded successfully with model: {model_path}")
     except Exception as e:

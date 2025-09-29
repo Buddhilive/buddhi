@@ -9,9 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "export": "next export",
-    "build:win:bin": "pyinstaller -c -F --clean --name buddhi-x86_64-pc-windows-msvc --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\" --paths core --paths \"core/.venv/Lib/site-packages\" --collect-all routers --collect-binaries numpy --collect-binaries scipy --collect-binaries torch --hidden-import sentence_transformers --hidden-import uvicorn",
-    "build:mac:bin": "pyinstaller -c -F --clean --name buddhi-aarch64-apple-darwin --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\" --paths core --collect-all routers --hidden-import sentence_transformers",
-    "build:lin:bin": "pyinstaller -c -F --clean --name buddhi-x86_64-unknown-linux-gnu --distpath src-tauri/bin/api core/main.py --add-data \"core/static;static\" --paths core --collect-all routers --hidden-import sentence_transformers",
+    "build:bin": ".\\core\\.venv\\Scripts\\pyinstaller .\\core\\buddhi.spec --distpath src-tauri/bin/api",
     "build:icons": "pnpm tauri icon public/logos/app-icon.png"
   },
   "dependencies": {
