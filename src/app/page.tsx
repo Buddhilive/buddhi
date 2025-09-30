@@ -1,13 +1,17 @@
 "use client";
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
+import Splashscreen from '@/components/splashscreen';
 
 export default function Home() {
   const [logs, setLogs] = useState("[ui] Listening for sidecar & network logs...");
+  const [isSidecarReady, setIsSidecarReady] = useState(false);
   
   useEffect(() => {
-    initSidecarListeners();
-  }, []);
+    if (isSidecarReady) {
+      initSidecarListeners();
+    }
+  }, [isSidecarReady]);
 
   const initSidecarListeners = async () => {
     // Listen for stdout lines from the sidecar
@@ -29,6 +33,15 @@ export default function Home() {
       unlistenStdout();
       unlistenStderr();
     };
+  };
+
+  const handleSidecarReady = () => {
+    setIsSidecarReady(true);
+  };
+
+  // Show splashscreen until sidecar is ready, then show main content
+  if (!isSidecarReady) {
+    return <Splashscreen onSidecarReady={handleSidecarReady}>Loading...</Splashscreen>;
   }
 
   return (

@@ -105,6 +105,8 @@ fn start_sidecar(app_handle: tauri::AppHandle) -> Result<String, String> {
     Ok("Sidecar spawned and monitoring started.".to_string())
 }
 
+
+
 fn main() {
     tauri::Builder::default()
         // Add any necessary plugins
@@ -120,7 +122,7 @@ fn main() {
             println!("[tauri] Sidecar spawned and monitoring started.");
             Ok(())
         })
-        // Register the shutdown_server command
+        // Register the commands
         .invoke_handler(tauri::generate_handler![
             start_sidecar,
             shutdown_sidecar,
