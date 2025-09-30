@@ -43,7 +43,6 @@ def load_model():
             model=model_path,
             device=current_device, # Use "cuda" if a GPU is available
             dtype=torch.bfloat16, # Use torch.float32 if bfloat16 is not supported
-            local_files_only=True  # Force using local files only, don't try to download from Hub
         )
         print(f"HuggingFace Pipeline loaded successfully with model: {model_path}")
     except Exception as e:

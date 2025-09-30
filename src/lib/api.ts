@@ -37,7 +37,7 @@ export const chatApi = {
     try {
       // In a Tauri app, we might use tauri commands or make a fetch to our backend
       // For now, assuming the backend is running locally
-      const response = await fetch('http://localhost:8008/v1/chat/completions', {
+      const response = await fetch('http://127.0.0.1:8008/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ export const chatApi = {
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Network error: Unable to connect to the AI service. Please make sure the backend server is running.');
+        throw new Error('Network error: Unable to connect to the AI service. Please make sure the backend server is running...\n' + error.message);
       }
       
       if (error instanceof Error) {
