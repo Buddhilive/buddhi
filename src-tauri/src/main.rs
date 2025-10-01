@@ -51,11 +51,24 @@ fn spawn_and_monitor_sidecar(app_handle: tauri::AppHandle) -> Result<(), String>
                 }
                 CommandEvent::Stderr(line_bytes) => {
                     let line = String::from_utf8_lossy(&line_bytes);
-                    eprintln!("Sidecar stderr: {}", line);
-                    // Emit the error line to the frontend
-                    app_handle
-                        .emit("sidecar-stderr", line.to_string())
-                        .expect("Failed to emit sidecar stderr event");
+                    // Filter out Uvicorn's info messages that are sent to stderr but aren't actual errors
+                    if line.contains("Uvicorn running on") || 
+                       line.contains("Started server process") || 
+                       line.contains("Waiting for application startup") ||
+                       line.contains("Application startup complete") {
+                        // These are info messages from Uvicorn, treat as info rather than error
+                        println!("Sidecar info: {}", line);
+                        // Emit as info to the frontend
+                        app_handle
+                            .emit("sidecar-stdout", line.to_string())
+                            .expect("Failed to emit sidecar stdout event");
+                    } else {
+                        eprintln!("Sidecar stderr: {}", line);
+                        // Emit the error line to the frontend
+                        app_handle
+                            .emit("sidecar-stderr", line.to_string())
+                            .expect("Failed to emit sidecar stderr event");
+                    }
                 }
                 _ => {}
             }

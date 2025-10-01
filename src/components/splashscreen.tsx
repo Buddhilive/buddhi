@@ -30,37 +30,35 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
         // Listen for sidecar stdout to detect when it's ready
         unlistenStdout = await listen('sidecar-stdout', (event: Event<string>) => {
           console.log('Sidecar stdout:', event.payload);
-          
           // Check if the payload indicates the sidecar is ready
           // This depends on what your Python sidecar outputs when ready
-          if (event.payload.toLowerCase().includes('ready') || 
-              event.payload.toLowerCase().includes('listening') ||
-              event.payload.toLowerCase().includes('server running') ||
-              event.payload.toLowerCase().includes('started')) {
+          if (event.payload.toLowerCase().includes('uvicorn running on')) {
             finishLoading();
           }
+          setLoadingMessage(event.payload);
         });
 
         // Listen for sidecar stderr as well
         unlistenStderr = await listen('sidecar-stderr', (event: Event<string>) => {
           console.error('Sidecar stderr:', event.payload);
+          console.log(event.payload);
           
           // Handle error conditions if needed
-          if (event.payload.toLowerCase().includes('error')) {
+          if (event.payload.toLowerCase().includes('info:')) {
             setLoadingMessage("Error starting sidecar. Please check logs.");
           }
         });
 
         setProgress(60);
-        setLoadingMessage("Waiting for Python sidecar to be ready...");
+        setLoadingMessage("Loading models...");
         
         // Set a timeout to show the main UI even if we don't get a ready signal
-        setTimeout(() => {
+        /* setTimeout(() => {
           // Only finish loading if it hasn't been finished already
           if (isLoading) {
             finishLoading();
           }
-        }, 15000); // Wait up to 15 seconds
+        }, 15000);  */// Wait up to 15 seconds
         
       } catch (error) {
         console.error('Error during splashscreen:', error);
@@ -108,7 +106,7 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
           </div>
           
           {/* Loading message */}
-          <p className="text-lg text-center mb-8">{loadingMessage}</p>
+          <p className="text-sm text-center mb-8">{loadingMessage}</p>
           
           {/* Progress bar */}
           <div className="w-full max-w-xs bg-gray-700/50 rounded-full h-2.5 mb-4">
