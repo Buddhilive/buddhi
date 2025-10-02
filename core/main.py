@@ -1,8 +1,10 @@
+from contextlib import asynccontextmanager
 import os
 import signal
 import sys
 import asyncio
 import threading
+import logging
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn import Config, Server
@@ -15,12 +17,51 @@ PORT_API = 8008
 
 server_instance = None  # Global reference to the Uvicorn server instance
 
+# Lifespan hook
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Function that runs on application startup and shutdown.
+    It's a context manager (yield) structure.
+    """
+    try:
+        # Preload the models
+        embeddings.load_model()
+        completions.load_model()
+    except Exception as e:
+        print(f"CRITICAL ERROR: Failed to load models: {e}")
+        
+    yield
+    print("[sidecar] Shutting down...", flush=True)
+    kill_process()
+
+
+# Programmatically force shutdown this sidecar.
+def kill_process():
+    os.kill(os.getpid(), signal.SIGINT)  # This force closes this script.
+
 app = FastAPI(
     title="Buddhi AI API server",
     version="0.1.0",
+    lifespan=lifespan
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# --- Determine the base path for bundled files ---
+# This is the directory where PyInstaller unpacked the files at runtime.
+if getattr(sys, 'frozen', False):
+    # Running inside a PyInstaller bundle
+    BUNDLE_DIR = sys._MEIPASS
+else:
+    # Running as a regular Python script (for development)
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- Construct the absolute path to the static folder ---
+STATIC_FILES_DIR = os.path.join(BUNDLE_DIR, 'static')
+
+# --- Initialize StaticFiles with the correct path ---
+# Ensure 'app' is your FastAPI instance
+app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")
+
 # Configure CORS settings
 origins = [
     "*",  # to whitelist any url, REMOVE THIS FOR PRODUCTION!!!
@@ -34,10 +75,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Preload the models
-embeddings.load_model()
-completions.load_model()
 
 # Tell client we are ready to accept requests.
 # This is a mock func, modify to your needs.
@@ -61,11 +98,6 @@ def connect_to_api_server():
 app.include_router(completions.COMPLETIONS_ROUTER)
 app.include_router(embeddings.EMBEDDING_ROUTER)
 
-# Programmatically force shutdown this sidecar.
-def kill_process():
-    os.kill(os.getpid(), signal.SIGINT)  # This force closes this script.
-
-
 # Programmatically startup the api server
 def start_api_server(**kwargs):
     global server_instance
@@ -73,7 +105,17 @@ def start_api_server(**kwargs):
     try:
         if server_instance is None:
             print("[sidecar] Starting API server...", flush=True)
-            config = Config(app, host="0.0.0.0", port=port, log_level="info")
+            # Configure Uvicorn to use custom logging setup
+            config = Config(
+                app, 
+                host="0.0.0.0", 
+                port=port, 
+                log_level="info",
+                # Disable Uvicorn's default access log to reduce noise
+                access_log=False,
+                # Use default logger to have more control over output
+                use_colors=False
+            )
             server_instance = Server(config)
             # Start the ASGI server
             asyncio.run(server_instance.serve())

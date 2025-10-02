@@ -2,6 +2,7 @@ from typing import Annotated, Any, List, Literal, Optional, Union
 from pydantic import BaseModel, BeforeValidator, Field
 from fastapi import APIRouter, HTTPException, Depends, status
 import torch
+from sentence_transformers import SentenceTransformer
 
 # --- Pydantic Schemas (from OpenAPI Specification) ---
 
@@ -62,11 +63,25 @@ class ErrorDetail(BaseModel):
 class ErrorResponse(BaseModel):
     error: ErrorDetail
 
+import os
+import sys
+
 # Configuration
-MODEL_PATH = "static/models/embeddinggemma-300m"
 TARGET_MODEL_NAME = "embeddinggemma-300m"
 EMBEDDING_ROUTER = APIRouter(prefix="/v1", tags=["llm"])
 CURRENT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# --- Determine the base path for bundled files ---
+# This is the directory where PyInstaller unpacked the files at runtime.
+if getattr(sys, 'frozen', False):
+    # Running inside a PyInstaller bundle
+    BUNDLE_DIR = sys._MEIPASS
+else:
+    # Running as a regular Python script (for development)
+    BUNDLE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# --- Construct the absolute path to the model ---
+MODEL_PATH = os.path.join(BUNDLE_DIR, 'static', 'models', 'embeddinggemma-300m')
 
 # Global variable to hold the loaded model
 S_MODEL = None
@@ -75,7 +90,6 @@ def load_model():
     """Load the SentenceTransformer model from the specified path."""
     global S_MODEL
     try:
-        from sentence_transformers import SentenceTransformer
         print(f"Loading SentenceTransformer model from: {MODEL_PATH}...")
         
         # NOTE: Using SentenceTransformer to load the downloaded model

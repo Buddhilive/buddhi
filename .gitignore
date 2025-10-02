@@ -47,5 +47,6 @@ __pycache__/
 *.sqlite3
 *.db
 .pytest_cache/
-*.spec
 static/
+core/dist/
+core/build/

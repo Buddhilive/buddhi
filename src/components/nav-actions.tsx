@@ -14,7 +14,6 @@ import {
   Link,
   MoreHorizontal,
   Settings2,
-  Star,
   Trash,
   Trash2,
 } from "lucide-react"
@@ -34,6 +33,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { ThemeModeToggle } from "./ui/theme-toggle"
 
 const data = [
   [
@@ -101,19 +101,14 @@ const data = [
 export function NavActions() {
   const [isOpen, setIsOpen] = React.useState(false)
 
-  React.useEffect(() => {
-    setIsOpen(true)
-  }, [])
+  function handleMenuOpen(isMenuOpen: boolean) {
+    setIsOpen(isMenuOpen);
+  }
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <div className="text-muted-foreground hidden font-medium md:inline-block">
-        Edit Oct 08
-      </div>
-      <Button variant="ghost" size="icon" className="h-7 w-7">
-        <Star />
-      </Button>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <ThemeModeToggle />
+      <Popover open={isOpen} onOpenChange={handleMenuOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
