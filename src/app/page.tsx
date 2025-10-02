@@ -1,11 +1,11 @@
 "use client";
 import { listen } from '@tauri-apps/api/event';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useSidecarStore } from '@/stores/sidecarStore';
 import Splashscreen from '@/components/splashscreen';
 
 export default function Home() {
-  const [logs, setLogs] = useState("[ui] Listening for sidecar & network logs...");
-  const [isSidecarReady, setIsSidecarReady] = useState(false);
+  const { logs, isSidecarReady, addLog } = useSidecarStore();
   
   useEffect(() => {
     if (isSidecarReady) {
@@ -17,15 +17,17 @@ export default function Home() {
     // Listen for stdout lines from the sidecar
     const unlistenStdout = await listen('sidecar-stdout', (event) => {
       console.log('Sidecar stdout:', event.payload);
-      if (`${event.payload}`.length > 0 && event.payload !== "\r\n")
-        setLogs(prev => prev += `\n${event.payload}`)
+      if (`${event.payload}`.length > 0 && event.payload !== "\r\n") {
+        addLog(`${event.payload}`);
+      }
     });
 
     // Listen for stderr lines from the sidecar
     const unlistenStderr = await listen('sidecar-stderr', (event) => {
       console.error('Sidecar stderr:', event.payload);
-      if (`${event.payload}`.length > 0 && event.payload !== "\r\n")
-        setLogs(prev => prev += `\n${event.payload}`)
+      if (`${event.payload}`.length > 0 && event.payload !== "\r\n") {
+        addLog(`${event.payload}`);
+      }
     });
 
     // Cleanup listeners when not needed
@@ -35,13 +37,9 @@ export default function Home() {
     };
   };
 
-  const handleSidecarReady = () => {
-    setIsSidecarReady(true);
-  };
-
   // Show splashscreen until sidecar is ready, then show main content
   if (!isSidecarReady) {
-    return <Splashscreen onSidecarReady={handleSidecarReady}>Loading...</Splashscreen>;
+    return <Splashscreen>Logs will appear here...</Splashscreen>;
   }
 
   return (

@@ -3,18 +3,29 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, Event } from '@tauri-apps/api/event';
+import { useSidecarStore } from '@/stores/sidecarStore';
 
 interface SplashscreenProps {
   children: React.ReactNode;
-  onSidecarReady: () => void;
+  onSidecarReady?: () => void;
 }
 
 export default function Splashscreen({ children, onSidecarReady }: SplashscreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Initializing application...");
   const [progress, setProgress] = useState(0);
+  const { isSidecarReady, setIsSidecarReady, addLog } = useSidecarStore();
 
   useEffect(() => {
+    // If the sidecar is already ready, immediately finish loading
+    if (isSidecarReady) {
+      setIsLoading(false);
+      if (onSidecarReady) {
+        onSidecarReady();
+      }
+      return;
+    }
+
     let unlistenStdout: (() => void) | null = null;
     let unlistenStderr: (() => void) | null = null;
     
@@ -30,6 +41,9 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
         // Listen for sidecar stdout to detect when it's ready
         unlistenStdout = await listen('sidecar-stdout', (event: Event<string>) => {
           console.log('Sidecar stdout:', event.payload);
+          // Add log to the global state
+          addLog(event.payload);
+          
           // Check if the payload indicates the sidecar is ready
           // This depends on what your Python sidecar outputs when ready
           if (event.payload.toLowerCase().includes('uvicorn running on')) {
@@ -42,6 +56,9 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
         unlistenStderr = await listen('sidecar-stderr', (event: Event<string>) => {
           console.error('Sidecar stderr:', event.payload);
           console.log(event.payload);
+          
+          // Add log to the global state
+          addLog(event.payload);
           
           // Handle error conditions if needed
           if (event.payload.toLowerCase().includes('info:')) {
@@ -76,7 +93,10 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
         
         setTimeout(() => {
           setIsLoading(false);
-          onSidecarReady(); // Notify parent that sidecar is ready
+          setIsSidecarReady(true); // Set global state
+          if (onSidecarReady) {
+            onSidecarReady(); // Notify parent if callback provided
+          }
         }, 500);
       } catch (error) {
         console.error('Error finishing loading:', error);
@@ -91,7 +111,7 @@ export default function Splashscreen({ children, onSidecarReady }: SplashscreenP
       if (unlistenStdout) unlistenStdout();
       if (unlistenStderr) unlistenStderr();
     };
-  }, [isLoading, onSidecarReady]);
+  }, [isLoading, onSidecarReady, isSidecarReady, setIsSidecarReady, addLog]);
 
   if (isLoading) {
     return (
