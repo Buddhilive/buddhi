@@ -35,14 +35,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# This is the directory where PyInstaller unpacked the files at runtime.
-if getattr(sys, 'frozen', False):
-    # Running inside a PyInstaller bundle
-    BUNDLE_DIR = sys._MEIPASS
-else:
-    # Running as a regular Python script (for development)
-    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- Construct the absolute path to the static folder ---
 STATIC_FILES_DIR = os.path.join(BUNDLE_DIR, 'static')
 app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")

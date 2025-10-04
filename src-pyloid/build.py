@@ -28,6 +28,7 @@ if __name__ == '__main__':
 			'--windowed',
 			'--add-data=./src-pyloid/icons/:./src-pyloid/icons/',
 			'--add-data=./dist-front/:./dist-front/',
+			'--add-data=./src-pyloid/static/:./static/',
 			f'--icon={icon}',
 		],
 	)
