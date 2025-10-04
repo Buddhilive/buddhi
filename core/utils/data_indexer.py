@@ -7,5 +7,5 @@ def load_and_chunk_pdf(file_path: str):
     texts = [doc.text for doc in document if getattr(doc, 'text', None)]
     chunks = []
     for text in texts:
-        chunks.extend(SentenceSplitter(chunk_size=10, chunk_overlap=200).split_text(text))
+        chunks.extend(SentenceSplitter(chunk_size=1024, chunk_overlap=200).split_text(text))
     return chunks

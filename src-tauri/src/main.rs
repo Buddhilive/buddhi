@@ -118,7 +118,10 @@ fn start_sidecar(app_handle: tauri::AppHandle) -> Result<String, String> {
     Ok("Sidecar spawned and monitoring started.".to_string())
 }
 
-
+#[tauri::command]
+fn greet_user(name: &str) -> String {
+    buddhi_ai_lib::greet(name)
+}
 
 fn main() {
     tauri::Builder::default()
@@ -139,7 +142,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_sidecar,
             shutdown_sidecar,
-            toggle_fullscreen
+            toggle_fullscreen,
+            greet_user
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

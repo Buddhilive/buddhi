@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { appWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, Event } from '@tauri-apps/api/event';
 
 export default function Splashscreen() {
   const [loadingMessage, setLoadingMessage] = useState("Initializing application...");
   const [progress, setProgress] = useState(0);
+  const appWindow = getCurrentWindow();
 
   useEffect(() => {
     let unlistenStdout: (() => void) | null = null;
