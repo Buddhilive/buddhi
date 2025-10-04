@@ -26,6 +26,12 @@ pub fn add_to_collection() {
     vector_db.unwrap().save_collection("vectors", &collection).unwrap();
 }
 
+// Delete Collection
+pub fn delete_collection() {
+    let vector_db = connect_db();
+    vector_db.unwrap().delete_collection("vectors").unwrap();
+}
+
 // Get Vector Database path
 fn get_db_path() -> String {
     let mut db_path = ".buddhi-ai/db/";

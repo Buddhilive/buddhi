@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 export default function LibraryPage() {
 
   const greet = async () => {
-    const greetings = await invoke("initialize_db");
+    const greetings = await invoke("delete_collection");
     console.log(greetings, typeof greetings);
   };
 
