@@ -1,0 +1,18 @@
+[project]
+name = "pyloid-app"
+version = "1.0.0"
+readme = "README.md"
+description = "My first application"
+
+requires-python = ">=3.9"
+
+dependencies = [
+    "pyloid>=0.26.3",
+    "pyloid-adapter[fastapi]>=0.2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pyloid-builder==0.2.2",
+    "ruff>=0.13.2",
+]
