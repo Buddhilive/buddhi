@@ -52,10 +52,11 @@ fn spawn_and_monitor_sidecar(app_handle: tauri::AppHandle) -> Result<(), String>
                 CommandEvent::Stderr(line_bytes) => {
                     let line = String::from_utf8_lossy(&line_bytes);
                     // Filter out Uvicorn's info messages that are sent to stderr but aren't actual errors
-                    if line.contains("Uvicorn running on") || 
-                       line.contains("Started server process") || 
-                       line.contains("Waiting for application startup") ||
-                       line.contains("Application startup complete") {
+                    if line.contains("Uvicorn running on")
+                        || line.contains("Started server process")
+                        || line.contains("Waiting for application startup")
+                        || line.contains("Application startup complete")
+                    {
                         // These are info messages from Uvicorn, treat as info rather than error
                         println!("Sidecar info: {}", line);
                         // Emit as info to the frontend
@@ -118,7 +119,26 @@ fn start_sidecar(app_handle: tauri::AppHandle) -> Result<String, String> {
     Ok("Sidecar spawned and monitoring started.".to_string())
 }
 
+// Connect to vector database
+#[tauri::command]
+fn initialize_db() -> Result<String, String> {
+    buddhi_ai_lib::connect_db().map_or_else(
+        || Err("Failed to connect to database".to_string()),
+        |_| Ok("Database connected successfully".to_string()),
+    )
+}
 
+// Add to collection
+#[tauri::command]
+fn add_to_collection() {
+    buddhi_ai_lib::add_to_collection()
+}
+
+// Delete collection
+#[tauri::command]
+fn delete_collection() {
+    buddhi_ai_lib::delete_collection()
+}
 
 fn main() {
     tauri::Builder::default()
@@ -139,7 +159,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_sidecar,
             shutdown_sidecar,
-            toggle_fullscreen
+            toggle_fullscreen,
+            initialize_db,
+            add_to_collection,
+            delete_collection
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

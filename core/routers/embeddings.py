@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends, status
 import torch
 from sentence_transformers import SentenceTransformer
 
+from utils.data_indexer import load_and_chunk_pdf
+
 # --- Pydantic Schemas (from OpenAPI Specification) ---
 
 # Nested Schemas
@@ -44,6 +46,12 @@ class CreateEmbeddingRequest(BaseModel):
     encoding_format: Optional[str] = Field("float", pattern="^(float|base64)$", description="The format to return the embeddings in.")
     user: Optional[str] = Field(None, description="A unique identifier representing your end-user.")
 
+# Request Schema for PDF embeddings
+class CreatePDFEmbeddingRequest(BaseModel):
+    """Request payload for creating embeddings from a PDF file."""
+    file: str = Field(..., description="Path to PDF file.")
+
+
 # Response Schema
 class CreateEmbeddingResponse(BaseModel):
     """Response payload containing generated embeddings."""
@@ -51,7 +59,7 @@ class CreateEmbeddingResponse(BaseModel):
     model: str = Field(..., description="The name of the model used to generate the embedding.")
     # FIX: Replaced Field(..., const=True) with Literal["list"] for Pydantic V2
     object: Literal["list"] = "list"
-    usage: Usage 
+    usage: Optional[Usage] = Field(None, description="Usage statistics for the request.")
 
 # Error Response Schema
 class ErrorDetail(BaseModel):
@@ -68,7 +76,7 @@ import sys
 
 # Configuration
 TARGET_MODEL_NAME = "embeddinggemma-300m"
-EMBEDDING_ROUTER = APIRouter(prefix="/v1", tags=["llm"])
+EMBEDDING_ROUTER = APIRouter(prefix="/v1", tags=["Embeddings"])
 CURRENT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Determine the base path for bundled files ---
@@ -102,9 +110,6 @@ def load_model():
         # Handle file not found or model loading errors
         print(f"Error loading model from {MODEL_PATH}: {e}")
         raise RuntimeError(f"Failed to load model from path: {MODEL_PATH}")
-
-# Call model loading function at startup (can be done in main app startup event)
-# load_model()
 
 # Dependency to ensure the model is loaded before processing requests
 def get_model():
@@ -196,6 +201,62 @@ async def create_embedding(
                 prompt_tokens=prompt_tokens,
                 total_tokens=total_tokens
             )
+        )
+        return response
+
+    except HTTPException:
+        # Re-raise explicit HTTPExceptions (like the 400 for wrong model)
+        raise
+
+    except Exception as e:
+        # Gracefully handle other unexpected server errors (500)
+        print(f"An unexpected error occurred: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "message": f"Internal server error: {e}",
+                    "type": "server_error",
+                    "code": "500_internal_error"
+                }
+            }
+        )
+
+@EMBEDDING_ROUTER.post('/embeddings/chunk/pdf', response_model=CreateEmbeddingResponse)
+async def create_embedding_from_pdf(request: CreatePDFEmbeddingRequest):
+    """ Create embeddings from a PDF file. """
+    try:
+        file_path = request.file
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": {
+                        "message": f"The file '{file_path}' does not exist.",
+                        "type": "invalid_request_error",
+                        "code": "file_not_found"
+                    }
+                }
+            )
+
+        chunks = load_and_chunk_pdf(file_path)
+        embeddings = S_MODEL.encode(chunks, convert_to_numpy=True)
+
+        embedding_data: List[Embedding] = []
+        for i, emb in enumerate(embeddings):
+            # Convert numpy array to standard Python list of floats
+            embedding_data.append(
+                Embedding(
+                    index=i,
+                    embedding=emb.tolist(),
+                    object="embedding"
+                )
+            )
+
+        response = CreateEmbeddingResponse(
+            data=embedding_data,
+            model=TARGET_MODEL_NAME,
+            object="list"
         )
         return response
 
