@@ -17,9 +17,6 @@ dist-front
 # Virtual environments
 .venv
 
-# uv
-uv.lock
-
 # pyinstaller
 dist
 
@@ -31,3 +28,6 @@ yarn.lock
 
 # bun
 bun-lock.yaml
+
+# Files
+src-pyloid/static/models/
