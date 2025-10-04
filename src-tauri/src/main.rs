@@ -119,8 +119,8 @@ fn start_sidecar(app_handle: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn greet_user(name: &str) -> String {
-    buddhi_ai_lib::greet(name)
+fn initialize_db() {
+    buddhi_ai_lib::add_to_collection()
 }
 
 fn main() {
@@ -143,7 +143,7 @@ fn main() {
             start_sidecar,
             shutdown_sidecar,
             toggle_fullscreen,
-            greet_user
+            initialize_db
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")
