@@ -35,7 +35,7 @@ def load_model():
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model directory not found: {model_path}")
         
-        print(f"Loading model from local path: {model_path}")
+        print(f"INFO:\tLoading Chat model...")
         
         # Use torch.bfloat16 only if the device and model support it
         pipe = pipeline(
@@ -44,7 +44,7 @@ def load_model():
             device=current_device, # Use "cuda" if a GPU is available
             dtype=torch.bfloat16, # Use torch.float32 if bfloat16 is not supported
         )
-        print(f"HuggingFace Pipeline loaded successfully with model: {model_path}")
+        print(f"INFO:\tHuggingFace Pipeline loaded successfully")
     except Exception as e:
         # If model loading fails, the API should not start or should return 500
         print(f"Error loading model: {e}")

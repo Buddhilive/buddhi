@@ -98,11 +98,11 @@ def load_model():
     """Load the SentenceTransformer model from the specified path."""
     global S_MODEL
     try:
-        print(f"Loading SentenceTransformer model from: {MODEL_PATH}...")
+        print(f"INFO:\tLoading SentenceTransformer...")
         
         # NOTE: Using SentenceTransformer to load the downloaded model
         S_MODEL = SentenceTransformer(MODEL_PATH, device=CURRENT_DEVICE)
-        print("Model loaded successfully!")
+        print("INFO:\tSentenceTransformer loaded successfully!")
     except ImportError:
         # Handle the case where the library is not installed
         raise RuntimeError("SentenceTransformer library not found. Please run 'pip install sentence-transformers'.")

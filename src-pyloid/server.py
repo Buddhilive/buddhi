@@ -47,6 +47,15 @@ else:
 STATIC_FILES_DIR = os.path.join(BUNDLE_DIR, 'static')
 app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")
 
+# Add CORS middleware directly to ensure it's applied properly
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
+
 def start(host: str, port: int):
 	import uvicorn
 
