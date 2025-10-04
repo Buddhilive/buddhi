@@ -9,7 +9,7 @@ from pyloid.serve import pyloid_serve
 from pyloid import Pyloid
 from server import adapter
 
-app = Pyloid(app_name="Pyloid-App", single_instance=True, server=adapter)
+app = Pyloid(app_name="Buddhi-AI", single_instance=True, server=adapter)
 
 if is_production():
     app.set_icon(get_production_path("src-pyloid/icons/icon.png"))

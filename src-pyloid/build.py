@@ -2,7 +2,7 @@ from pyloid_builder.pyinstaller import pyinstaller
 from pyloid.utils import get_platform
 
 
-name = 'pyloid-app'
+name = 'buddhi-ai'
 dist_path = './dist'
 work_path = './build'
 
