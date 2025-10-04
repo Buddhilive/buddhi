@@ -1,4 +1,5 @@
 import { ChatMessage } from '@/types/chat';
+import { fetch } from 'pyloid-js';
 
 interface ChatCompletionRequest {
   model: string;
@@ -37,7 +38,7 @@ export const chatApi = {
     try {
       // In a Tauri app, we might use tauri commands or make a fetch to our backend
       // For now, assuming the backend is running locally
-      const response = await fetch('http://127.0.0.1:8008/v1/chat/completions', {
+      const response = await fetch('/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
