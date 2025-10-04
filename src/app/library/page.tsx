@@ -1,13 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { invoke } from "@tauri-apps/api/core";
 
 export default function LibraryPage() {
 
   const greet = async () => {
-    const greetings = await invoke("delete_collection");
-    console.log(greetings, typeof greetings);
+    console.log("Namo Buddhaya!");
   };
 
   return (

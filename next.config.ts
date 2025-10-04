@@ -1,13 +1,12 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  ...(process.env.NODE_ENV === "production" && {
-    output: "export",
-    trailingSlash: true,
-    images: {
-      unoptimized: true,
-    },
-  }),
+  output: 'export',
+  distDir: 'dist-front',
+  trailingSlash: true,
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;
