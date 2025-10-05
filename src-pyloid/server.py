@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     """
     try:
         # Preload the models
-        embeddings.load_model()
+        embeddings.initialize()
         completions.load_model()
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to load models: {e}")

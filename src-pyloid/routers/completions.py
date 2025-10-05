@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from typing import List, Optional, Literal
@@ -7,21 +8,11 @@ from transformers import pipeline
 import torch
 import uuid
 
-import os
-import sys
-
+# Configurations
+logging.basicConfig(level=logging.INFO)
 COMPLETIONS_ROUTER = APIRouter(prefix="/v1", tags=["Chat"])
-
-# --- Determine the base path for bundled files ---
-# This is the directory where PyInstaller unpacked the files at runtime.
-if getattr(sys, 'frozen', False):
-    # Running inside a PyInstaller bundle
-    BUNDLE_DIR = sys._MEIPASS
-else:
-    # Running as a regular Python script (for development)
-    BUNDLE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# --- Construct the absolute path to the model ---
+# Construct the absolute path to the model
+BUNDLE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 model_path = os.path.join(BUNDLE_DIR, 'static', 'models', 'gemma-3-270m-it')
 current_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -35,7 +26,7 @@ def load_model():
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model directory not found: {model_path}")
         
-        print(f"INFO:\tLoading Chat model...")
+        logging.info("\tLoading Chat model...")
         
         # Use torch.bfloat16 only if the device and model support it
         pipe = pipeline(
@@ -44,14 +35,14 @@ def load_model():
             device=current_device, # Use "cuda" if a GPU is available
             dtype=torch.bfloat16, # Use torch.float32 if bfloat16 is not supported
         )
-        print(f"INFO:\tHuggingFace Pipeline loaded successfully")
+        logging.info("\tHuggingFace Pipeline loaded successfully")
     except Exception as e:
         # If model loading fails, the API should not start or should return 500
-        print(f"Error loading model: {e}")
+        logging.error(f"Error loading model: {e}")
         pipe = None 
 
 
-# --- Pydantic Models for OpenAI Chat Completions Standard ---
+# Pydantic Models for OpenAI Chat Completions Standard
 
 # Request Models (Input)
 
@@ -114,7 +105,7 @@ class ChatCompletionResponse(BaseModel):
     usage: Usage
 
 
-# --- Standardized Chat Completion Endpoint ---
+# Standardized Chat Completion Endpoint
 
 @COMPLETIONS_ROUTER.post("/chat/completions", response_model=ChatCompletionResponse)
 async def create_chat_completion(
@@ -180,7 +171,7 @@ async def create_chat_completion(
 
     generated_text = output[0]['generated_text']
     
-    # --- Estimate Token Usage (Simplified) ---
+    # Estimate Token Usage (Simplified)
     # NOTE: Accurate token counting requires the model's tokenizer.
     # We use a rough, character-based estimate for this sample.
     chars_per_token = 4
@@ -190,7 +181,7 @@ async def create_chat_completion(
     completion_tokens = len(generated_text) // chars_per_token
     total_tokens = prompt_tokens + completion_tokens
 
-    # --- Build the Final Response ---
+    # Build the Final Response
     
     response_message = ChatCompletionResponseMessage(
         role='assistant',
