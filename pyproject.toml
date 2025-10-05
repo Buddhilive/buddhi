@@ -14,12 +14,11 @@ dependencies = [
     "pyloid>=0.26.3",
     "pyloid-adapter[fastapi]>=0.2.4",
     "python-multipart>=0.0.20",
-    "sentence-transformers>=5.1.1",
     "transformers>=4.57.0",
+    "torch>=2.8.0",
+    "llama-index-embeddings-huggingface>=0.6.1",
+    "llama-index-llms-huggingface>=0.6.1",
 ]
 
 [dependency-groups]
-dev = [
-    "pyloid-builder==0.2.2",
-    "ruff>=0.13.2",
-]
+dev = ["pyloid-builder==0.2.2", "ruff>=0.13.2"]

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from routers import embeddings
-from routers import completions
+# from routers import completions
 
 # Lifespan hook
 @asynccontextmanager
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     try:
         # Preload the models
         embeddings.initialize()
-        completions.load_model()
+        # completions.load_model()
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to load models: {e}")
         
@@ -81,7 +81,7 @@ async def create_window(request: Request):
 	win.show_and_focus()
 
 # Include Routers
-app.include_router(completions.COMPLETIONS_ROUTER)
+# app.include_router(completions.COMPLETIONS_ROUTER)
 app.include_router(embeddings.EMBEDDING_ROUTER)
 
 # Programmatically force shutdown the server.

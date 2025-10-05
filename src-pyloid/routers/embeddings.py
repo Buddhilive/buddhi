@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 from tempfile import TemporaryDirectory
-from typing import List, Literal
+from typing import List, Literal, Optional
 import chromadb
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -14,6 +14,9 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core import SimpleDirectoryReader, StorageContext, Settings, VectorStoreIndex
 from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.llms.huggingface import HuggingFaceLLM
+from llama_index.core.chat_engine import CondenseQuestionChatEngine
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 # Configuration
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +36,11 @@ TOP_K = 3
 chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
 chroma_collection = chroma_client.get_or_create_collection(CHROMA_COLLECTION_NAME)
 
+# Model Configuration
+LLM_MODEL_NAME = os.path.join(BUNDLE_DIR, 'static', 'models', 'gemma-3-270m-it') 
+LLM_SYSTEM_PROMPT = """You are an expert AI assistant providing answers based ONLY on the private documents provided in the context.
+If the answer is not in the documents, state clearly that you cannot answer from the provided information."""
+
 # LlamaIndex Components Setup
 embed_model = None
 node_parser = None
@@ -40,6 +48,9 @@ vector_store = None
 pipeline = None
 retriever = None
 query_engine = None
+llm = None
+vector_index = None
+chat_engine = None
 
 def initialize():
     """
@@ -49,16 +60,10 @@ def initialize():
     Returns:
         bool: True if initialization was successful, False otherwise.
     """
-    global embed_model
-    global node_parser
-    global vector_store
-    global pipeline
-    global retriever
-    global query_engine
+    global embed_model, node_parser, vector_store, pipeline, retriever, query_engine
+    global llm, vector_index, chat_engine
     
     logging.info("Starting LlamaIndex component setup...")
-
-    Settings.llm = None
     
     try:
         # LlamaIndex Components Setup
@@ -66,7 +71,7 @@ def initialize():
         # 1. Initialize Embedding Model (Potential model download/name errors)
         embed_model = HuggingFaceEmbedding(
             model_name=EMBED_MODEL_NAME,
-            device="cpu" 
+            device=CURRENT_DEVICE 
         )
         logging.info(f"Initialized embedding model: {EMBED_MODEL_NAME}")
         
@@ -83,27 +88,57 @@ def initialize():
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         logging.info("Initialized Chroma vector store.")
         
-        # 4. Initialize Ingestion Pipeline
+        # 4. Initialize LLM
+        # Note: You might need to adjust parameters like context_window for your specific model/hardware.
+        # This setup attempts to use the model on the available device.
+        logging.info(f"Initializing HuggingFace LLM: {LLM_MODEL_NAME} on device: {CURRENT_DEVICE}")
+        
+        tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
+
+        llm = HuggingFaceLLM(
+            context_window=8192,  # Set based on the LLM's capability
+            max_new_tokens=2048,
+            generate_kwargs={"temperature": 0.1, "do_sample": True},
+            system_prompt=LLM_SYSTEM_PROMPT,
+            tokenizer=tokenizer,
+            model=AutoModelForCausalLM.from_pretrained(
+                LLM_MODEL_NAME, 
+                device_map=str(CURRENT_DEVICE), # Use device_map for better loading
+                dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32 
+            ),
+            device_map=str(CURRENT_DEVICE),
+        )
+        Settings.llm = llm # Set the global LLM setting
+        logging.info(f"Initialized LLM: {LLM_MODEL_NAME}")
+        
+        # 5. Setup Index, Retriever, and Query/Chat Engines 
         pipeline = IngestionPipeline(
-            transformations=[
-                node_parser,
-                embed_model,
-            ],
+            transformations=[node_parser, embed_model],
             vector_store=vector_store,
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
+        # Create/Load VectorIndex
         vector_index = VectorStoreIndex.from_vector_store(
             vector_store=vector_store,
             embed_model=embed_model,
             storage_context=storage_context
         )
 
-        # Retriever setup for /query_pdf/
+        # Retriever setup for /query_pdf/ (Context retrieval, no synthesis)
         retriever = vector_index.as_retriever(similarity_top_k=TOP_K)
         query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=None)
 
-        logging.info("Successfully initialized all LlamaIndex components.")
+        # Chat Engine setup for /chat/completions/ (Retrieval-Augmented Generation)
+        # We use CondenseQuestionChatEngine for stateful chat that still uses the retriever (RAG)
+        chat_engine = CondenseQuestionChatEngine.from_defaults(
+            retriever=retriever,
+            llm=llm,
+            verbose=True, # Set to False in production
+            query_engine=query_engine,
+        )
+        
+        logging.info("Successfully initialized all LlamaIndex components (including LLM and Chat Engine).")
         return True
         
     except ImportError as e:
@@ -112,6 +147,7 @@ def initialize():
         logging.error(f"Details: {e}")
         # Optionally, reset globals if any were partially set
         embed_model, node_parser, vector_store, pipeline = None, None, None, None
+        llm, vector_index, chat_engine = None, None, None
         return False
         
     except Exception as e:
@@ -159,6 +195,40 @@ class QueryResponse(BaseModel):
     retrieval_model: str
     top_k: int
     matches: List[MatchingChunk] = Field(..., description="A list of the most relevant document chunks.")
+
+class Message(BaseModel):
+    """OpenAI standard message object."""
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+class ChatCompletionRequest(BaseModel):
+    """OpenAI standard completion API request body."""
+    model: str = Field(LLM_MODEL_NAME, description="The LLM model name. Defaults to Gemma.")
+    messages: List[Message]
+    temperature: Optional[float] = 0.1
+    max_tokens: Optional[int] = 2048
+    # Not all fields are strictly required, but included for standard compliance
+
+class ChatCompletionChoice(BaseModel):
+    """OpenAI standard choice object."""
+    index: int
+    message: Message
+    finish_reason: Literal["stop", "length", "content_filter"]
+
+class Usage(BaseModel):
+    """OpenAI standard usage object."""
+    prompt_tokens: int = 0 # LlamaIndex doesn't easily provide token counts here
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+class ChatCompletionResponse(BaseModel):
+    """OpenAI standard completion API response body."""
+    id: str = "chatcmpl-1234567890"
+    object: Literal["chat.completion"] = "chat.completion"
+    created: int = Field(..., description="Timestamp of the response.")
+    model: str = LLM_MODEL_NAME
+    choices: List[ChatCompletionChoice]
+    usage: Usage
 
 # FastAPI Endpoints
 @EMBEDDING_ROUTER.post("/upload_and_index_pdf/", response_model=IndexResponse)
@@ -290,4 +360,56 @@ async def query_pdf(request: QueryRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error during PDF retrieval: {e}"
+        )
+
+# Chat Completion Endpoint
+@EMBEDDING_ROUTER.post("/chat/completions", response_model=ChatCompletionResponse)
+async def chat_completions(request: ChatCompletionRequest):
+    """
+    OpenAI-standard chat completion endpoint. Uses LlamaIndex's CondenseQuestionChatEngine 
+    with Gemma to answer user queries using context from the vectorized PDF documents.
+    """
+    if not chat_engine:
+        raise HTTPException(status_code=503, detail="Chat engine is not initialized. Please ensure initialization succeeded.")
+        
+    # Extract the latest user message (assuming standard chat flow)
+    user_message = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
+
+    if not user_message:
+        raise HTTPException(status_code=400, detail="No user message found in the request messages.")
+    
+    # Send the user query to the LlamaIndex chat engine
+    try:
+        # LlamaIndex's chat engine handles history internally
+        response = chat_engine.chat(user_message)
+        
+        # Note: LlamaIndex response object doesn't provide easy access to token usage
+        # or a standard 'finish_reason', so we'll use sensible defaults.
+        
+        current_timestamp = int(os.times()[4])
+        
+        # Construct the response in the OpenAI standard format
+        return ChatCompletionResponse(
+            id="chatcmpl-custom-rag-1",
+            object="chat.completion",
+            created=current_timestamp,
+            model=request.model,
+            choices=[
+                ChatCompletionChoice(
+                    index=0,
+                    message=Message(role="assistant", content=response.response),
+                    finish_reason="stop" # Assuming a natural stop
+                )
+            ],
+            usage=Usage(
+                prompt_tokens=0, # Default to 0 due to difficulty in accurate tracking
+                completion_tokens=0,
+                total_tokens=0
+            )
+        )
+
+    except Exception as e:
+        logging.error(f"Error during chat completion: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing chat request: {e}"
         )
