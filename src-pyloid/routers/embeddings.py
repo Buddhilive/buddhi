@@ -2,17 +2,18 @@ import logging
 import os
 import shutil
 from tempfile import TemporaryDirectory
-from typing import Literal
+from typing import List, Literal
 import chromadb
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import torch
 from pathlib import Path
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core import SimpleDirectoryReader
+from llama_index.core import SimpleDirectoryReader, StorageContext, Settings, VectorStoreIndex
+from llama_index.core.query_engine import RetrieverQueryEngine
 
 # Configuration
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +27,7 @@ EMBED_MODEL_NAME = os.path.join(BUNDLE_DIR, 'static', 'models', 'embeddinggemma-
 CHROMA_PERSIST_DIR = os.path.join(Path.home(), ".buddhi-ai","kb")
 # Name of the ChromaDB collection
 CHROMA_COLLECTION_NAME = "pdf_rag_collection"
+TOP_K = 3
 
 # Global ChromaDB Client and Collection (initialized on startup)
 chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
@@ -36,6 +38,8 @@ embed_model = None
 node_parser = None
 vector_store = None
 pipeline = None
+retriever = None
+query_engine = None
 
 def initialize():
     """
@@ -49,8 +53,12 @@ def initialize():
     global node_parser
     global vector_store
     global pipeline
+    global retriever
+    global query_engine
     
     logging.info("Starting LlamaIndex component setup...")
+
+    Settings.llm = None
     
     try:
         # LlamaIndex Components Setup
@@ -83,6 +91,18 @@ def initialize():
             ],
             vector_store=vector_store,
         )
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+        vector_index = VectorStoreIndex.from_vector_store(
+            vector_store=vector_store,
+            embed_model=embed_model,
+            storage_context=storage_context
+        )
+
+        # Retriever setup for /query_pdf/
+        retriever = vector_index.as_retriever(similarity_top_k=TOP_K)
+        query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=None)
+
         logging.info("Successfully initialized all LlamaIndex components.")
         return True
         
@@ -122,6 +142,23 @@ class ResetResponse(BaseModel):
     """Pydantic model for the collection reset response."""
     status: Literal["success"]
     message: str
+
+class QueryRequest(BaseModel):
+    """Pydantic model for the query request body."""
+    query: str = Field(..., description="The natural language query to search the documents.")
+
+class MatchingChunk(BaseModel):
+    """Pydantic model for a single retrieved chunk."""
+    text: str = Field(..., description="The relevant text content from the document.")
+    similarity_score: float = Field(..., description="The similarity score of the chunk to the query.")
+    source_filename: str | None = Field(None, description="The original filename this chunk came from.")
+
+class QueryResponse(BaseModel):
+    """Pydantic model for the retrieval query response."""
+    query: str
+    retrieval_model: str
+    top_k: int
+    matches: List[MatchingChunk] = Field(..., description="A list of the most relevant document chunks.")
 
 # FastAPI Endpoints
 @EMBEDDING_ROUTER.post("/upload_and_index_pdf/", response_model=IndexResponse)
@@ -211,4 +248,46 @@ async def reset_chroma_collection():
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error resetting ChromaDB collection: {e}"
+        )
+    
+# Query Vector Database
+@EMBEDDING_ROUTER.post("/query_pdf/", response_model=QueryResponse)
+async def query_pdf(request: QueryRequest):
+    """
+    Sends a query to the ChromaDB vector store and retrieves the top-K matching 
+    document chunks using the EmbeddingGemma model.
+    """
+    try:
+        # Use the LlamaIndex query engine to handle embedding and retrieval
+        response = query_engine.query(request.query)
+        
+        # Process the source nodes from the response into the Pydantic format
+        matching_chunks = []
+        for node_with_score in response.source_nodes:
+            # Get the similarity score provided by LlamaIndex
+            score = node_with_score.score
+            # Get the text content of the node (chunk)
+            text = node_with_score.text
+            # Extract metadata (assuming the PDF loader adds 'file_name' metadata)
+            filename = node_with_score.metadata.get('file_name', 'Unknown')
+            
+            matching_chunks.append(
+                MatchingChunk(
+                    text=text,
+                    similarity_score=score,
+                    source_filename=filename
+                )
+            )
+
+        # Return the final Pydantic response
+        return QueryResponse(
+            query=request.query,
+            retrieval_model=EMBED_MODEL_NAME,
+            top_k=TOP_K,
+            matches=matching_chunks
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error during PDF retrieval: {e}"
         )
