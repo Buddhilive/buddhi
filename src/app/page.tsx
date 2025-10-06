@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { chatApi } from "@/lib/api";
 import { Message } from "@/types/chat";
+import { promtTemplateService } from "@/lib/prompt-templates";
 
 export default function Home() {
   const {
@@ -43,12 +44,23 @@ export default function Home() {
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
-    const similarDocs = await chatApi.queryKnowledgebase(inputValue);
-    let relevantDoc;
-    if (similarDocs) relevantDoc = chatApi.getTopRelevantMatch(similarDocs.matches);
-    console.log("relevantDoc", relevantDoc);
-
     try {
+      const similarDocs = await chatApi.queryKnowledgebase(inputValue);
+      let relevantDoc;
+      if (similarDocs) relevantDoc = chatApi.getTopRelevantMatch(similarDocs.matches);
+      console.log("relevantDoc", relevantDoc);
+      // Create a separate copy for API request to avoid modifying the original message in store
+      const newUserMsg = {
+        ...userMessage,
+      };
+
+      if (relevantDoc && relevantDoc.text) {
+        const prompt = promtTemplateService.generateRAGTemplate(
+          inputValue,
+          relevantDoc.text,
+        );
+        newUserMsg.content = prompt;
+      }
       // Transform messages for API request (only include content that is not null)
       const systemMessage: Message = {
         role: "system",
@@ -68,7 +80,7 @@ export default function Home() {
       // Add the new user message to the API request
       apiMessages.push({
         role: "user",
-        content: userMessage.content,
+        content: newUserMsg.content,
       });
 
       // Call the API

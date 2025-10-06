@@ -4,7 +4,7 @@ import time
 from typing import Generator, List, Optional, Literal
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from transformers import pipeline, TextStreamer
 import queue
 import torch
@@ -66,17 +66,29 @@ class ChatMessage(BaseModel):
 class CreateChatCompletionRequest(BaseModel):
     """
     Request body for the /v1/chat/completions endpoint.
-    It expects a list of messages and a model ID.
+    It expects either a list of messages or a single prompt string.
     """
     model: str = Field(
         LLM_MODEL_NAME, description="The LLM model name. Defaults to Gemma."
     )
-    messages: List[ChatMessage] = Field(..., min_length=1, description="The conversation history.")
+    messages: Optional[List[ChatMessage]] = Field(None, description="The conversation history.")
+    prompt: Optional[str] = Field(None, description="The input prompt for completion.")
     
     # Include other common OpenAI parameters (optional and set to defaults)
     temperature: Optional[float] = Field(default=1.0, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=50, ge=1)
     stream: Optional[bool] = False
+
+    @model_validator(mode='after')
+    def validate_messages_or_prompt(self):
+        if self.messages is None and self.prompt is None:
+            raise ValueError("Either 'messages' or 'prompt' must be provided.")
+        if self.messages is not None and self.prompt is not None:
+            # If both are provided, prioritize messages as per requirements
+            self.prompt = None
+        if self.messages is not None and len(self.messages) == 0:
+            raise ValueError("'messages' must not be empty if provided.")
+        return self
 
 # Response Models (Output)
 class Usage(BaseModel):
@@ -140,6 +152,7 @@ async def create_chat_completion(
     
     Maps the standard request structure (messages) to the pipeline and 
     then formats the output to match the standard OpenAI response.
+    Supports both messages array and prompt string parameters.
     """
     if BUDDHI_AI_PIPELINE is None:
         raise HTTPException(
@@ -148,20 +161,26 @@ async def create_chat_completion(
         )
 
     # 1. Adapt Input for Hugging Face Pipeline
+    hf_messages = []
     
-    # The HF pipeline expects a specific list of message dictionaries.
-    # We must convert the Pydantic model's list of ChatMessage to the
-    # format expected by the tokenizer/pipeline (e.g., {"role": str, "content": str}).
-    hf_messages = [
-        {"role": msg.role, "content": msg.content}
-        for msg in payload.messages
-        if msg.content is not None # Filter out messages with None content for text-only model
-    ]
+    if payload.messages is not None:
+        # Handle messages array (chat completions format)
+        hf_messages = [
+            {"role": msg.role, "content": msg.content}
+            for msg in payload.messages
+            if msg.content is not None # Filter out messages with None content for text-only model
+        ]
+    elif payload.prompt is not None:
+        # Handle prompt string (completions format)
+        # Treat the prompt as a user message
+        hf_messages = [
+            {"role": "user", "content": payload.prompt}
+        ]
     
     if not hf_messages:
         raise HTTPException(
             status_code=400,
-            detail="Request must contain at least one message with content."
+            detail="Request must contain either 'messages' with content or a 'prompt' string."
         )
     
     # Check for streaming request ------------------------------------------
