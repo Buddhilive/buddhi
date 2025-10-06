@@ -199,10 +199,8 @@ async def create_chat_completion(
     
     generation_time = time.time() - start_time
     
-    # 3. Process and Format Output to OpenAI Standard
-    
-    # The pipeline output is typically a list of dicts, e.g., [{'generated_text': '...'}]
-    
+    # 3. Process and Format Output to OpenAI Standard   
+    # The pipeline output is typically a list of dicts, e.g., [{'generated_text': '...'}]    
     # Check if we got any valid response
     if not output or 'generated_text' not in output[0]:
         raise HTTPException(
@@ -223,7 +221,6 @@ async def create_chat_completion(
     total_tokens = prompt_tokens + completion_tokens
 
     # Build the Final Response
-    
     response_message = ChatCompletionResponseMessage(
         role='assistant',
         content=generated_text.strip()
@@ -246,7 +243,7 @@ async def create_chat_completion(
     return ChatCompletionResponse(
         id=f"chatcmpl-{uuid.uuid4().hex[:20]}",
         object='chat.completion',
-        created=generation_time,
+        created=int(time.time()),
         model=payload.model,
         choices=[choice],
         usage=usage_data
