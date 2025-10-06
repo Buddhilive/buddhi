@@ -13,6 +13,7 @@ build
 *.local
 build-front
 dist-front
+.next/
 
 # Virtual environments
 .venv
