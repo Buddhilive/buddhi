@@ -2,10 +2,9 @@ import logging
 import os
 import shutil
 from tempfile import TemporaryDirectory
-import time
-from typing import Iterator, List, Literal, Optional
+from typing import List, Literal
 import chromadb
-from fastapi import APIRouter, File, HTTPException, UploadFile, Query
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 import torch
 from pathlib import Path
@@ -20,11 +19,6 @@ from llama_index.core import (
     VectorStoreIndex,
 )
 from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.llms.huggingface import HuggingFaceLLM
-from llama_index.core.chat_engine import CondenseQuestionChatEngine
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from fastapi.responses import StreamingResponse
-from llama_index.core.llms import ChatMessage, MessageRole
 
 # Configuration
 logging.basicConfig(level=logging.INFO)
@@ -44,11 +38,6 @@ TOP_K = 3
 chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
 chroma_collection = chroma_client.get_or_create_collection(CHROMA_COLLECTION_NAME)
 
-# Model Configuration
-LLM_MODEL_NAME = os.path.join(BUNDLE_DIR, "static", "models", "gemma-3-270m-it")
-LLM_SYSTEM_PROMPT = """You are an expert AI assistant providing answers based ONLY on the private documents provided in the context.
-If the answer is not in the documents, state clearly that you cannot answer from the provided information."""
-
 # LlamaIndex Components Setup
 embed_model = None
 node_parser = None
@@ -56,10 +45,6 @@ vector_store = None
 pipeline = None
 retriever = None
 query_engine = None
-llm = None
-vector_index = None
-chat_engine = None
-
 
 def initialize():
     """
@@ -70,7 +55,6 @@ def initialize():
         bool: True if initialization was successful, False otherwise.
     """
     global embed_model, node_parser, vector_store, pipeline, retriever, query_engine
-    global llm, vector_index, chat_engine
 
     logging.info("Starting LlamaIndex component setup...")
 
@@ -96,40 +80,9 @@ def initialize():
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         logging.info("Initialized Chroma vector store.")
 
-        # 4. Initialize LLM
-        # Note: You might need to adjust parameters like context_window for your specific model/hardware.
-        # This setup attempts to use the model on the available device.
-        logging.info(
-            f"Initializing HuggingFace LLM: {LLM_MODEL_NAME} on device: {CURRENT_DEVICE}"
-        )
+        Settings.llm = None
 
-        tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
-
-        # Gemma models use '<end_of_turn>' or '<eos_token>' to signify the end of a response.
-        # We'll use the tokenizer's built-in EOS token, which is often sufficient.
-        stop_token_id = tokenizer.eos_token_id
-
-        llm = HuggingFaceLLM(
-            context_window=8192,  # Set based on the LLM's capability
-            max_new_tokens=200,
-            generate_kwargs={
-                "temperature": 0.1,
-                "do_sample": True,
-                "eos_token_id": stop_token_id,
-            },
-            system_prompt=LLM_SYSTEM_PROMPT,
-            tokenizer=tokenizer,
-            model=AutoModelForCausalLM.from_pretrained(
-                LLM_MODEL_NAME,
-                device_map=str(CURRENT_DEVICE),  # Use device_map for better loading
-                dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-            ),
-            device_map=str(CURRENT_DEVICE),
-        )
-        Settings.llm = llm  # Set the global LLM setting
-        logging.info(f"Initialized LLM: {LLM_MODEL_NAME}")
-
-        # 5. Setup Index, Retriever, and Query/Chat Engines
+        # 5. Setup Index, Retriever, and Query
         pipeline = IngestionPipeline(
             transformations=[node_parser, embed_model],
             vector_store=vector_store,
@@ -149,16 +102,6 @@ def initialize():
             retriever=retriever, response_synthesizer=None
         )
 
-        # Chat Engine setup for /chat/completions/ (Retrieval-Augmented Generation)
-        # We use CondenseQuestionChatEngine for stateful chat that still uses the retriever (RAG)
-
-        chat_engine = CondenseQuestionChatEngine.from_defaults(
-            retriever=retriever,
-            llm=llm,
-            verbose=True,  # Set to False in production
-            query_engine=query_engine,
-        )
-
         logging.info(
             "Successfully initialized all LlamaIndex components (including LLM and Chat Engine)."
         )
@@ -172,7 +115,6 @@ def initialize():
         logging.error(f"Details: {e}")
         # Optionally, reset globals if any were partially set
         embed_model, node_parser, vector_store, pipeline = None, None, None, None
-        llm, vector_index, chat_engine = None, None, None
         return False
 
     except Exception as e:
@@ -234,69 +176,6 @@ class QueryResponse(BaseModel):
     matches: List[MatchingChunk] = Field(
         ..., description="A list of the most relevant document chunks."
     )
-
-class Message(BaseModel):
-    """OpenAI standard message object."""
-
-    role: Literal["system", "user", "assistant"]
-    content: str
-
-class ChatCompletionRequest(BaseModel):
-    """OpenAI standard completion API request body."""
-
-    model: str = Field(
-        LLM_MODEL_NAME, description="The LLM model name. Defaults to Gemma."
-    )
-    messages: List[Message]
-    temperature: Optional[float] = 0.1
-    max_tokens: Optional[int] = 2048
-    stream: Optional[bool] = False
-
-class ChatCompletionChoice(BaseModel):
-    """OpenAI standard choice object."""
-
-    index: int
-    message: Message
-    finish_reason: Literal["stop", "length", "content_filter"]
-
-
-class Usage(BaseModel):
-    """OpenAI standard usage object."""
-
-    prompt_tokens: int = 0  # LlamaIndex doesn't easily provide token counts here
-    completion_tokens: int = 0
-    total_tokens: int = 0
-
-
-class ChatCompletionResponse(BaseModel):
-    """OpenAI standard completion API response body."""
-
-    id: str = "chatcmpl-1234567890"
-    object: Literal["chat.completion"] = "chat.completion"
-    created: int = Field(..., description="Timestamp of the response.")
-    model: str = LLM_MODEL_NAME
-    choices: List[ChatCompletionChoice]
-    usage: Usage
-
-class DeltaMessage(BaseModel):
-    """Represents a chunk of the message content."""
-    role: Optional[Literal["system", "user", "assistant"]] = None
-    content: Optional[str] = ""
-
-class ChatCompletionChunkChoice(BaseModel):
-    """A choice object within the streaming chunk."""
-    index: int
-    delta: DeltaMessage
-    finish_reason: Optional[Literal["stop", "length", "content_filter"]] = None
-class ChatCompletionChunk(BaseModel):
-    """The streaming response object, following OpenAI's SSE format."""
-    id: str = "chatcmpl-stream-custom-rag-1"
-    object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
-    created: int = Field(..., description="Timestamp of the response.")
-    model: str = LLM_MODEL_NAME
-    choices: List[ChatCompletionChunkChoice]
-    usage: Optional[Usage] = None # Usage often sent only at the end or not at all in stream
-
 
 # FastAPI Endpoints
 @EMBEDDING_ROUTER.post("/upload_and_index_pdf/", response_model=IndexResponse)
@@ -429,139 +308,3 @@ async def query_pdf(request: QueryRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error during PDF retrieval: {e}")
-
-
-# Chat Completion Endpoint
-@EMBEDDING_ROUTER.post("/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(request: ChatCompletionRequest):
-    """
-    OpenAI-standard chat completion endpoint. Uses LlamaIndex's CondenseQuestionChatEngine
-    with Gemma to answer user queries using context from the vectorized PDF documents.
-    """
-    if not chat_engine:
-        raise HTTPException(
-            status_code=503,
-            detail="Chat engine is not initialized. Please ensure initialization succeeded.",
-        )
-
-    # Extract the latest user message (assuming standard chat flow)
-    user_message = next(
-        (m.content for m in reversed(request.messages) if m.role == "user"), None
-    )
-
-    if not user_message:
-        raise HTTPException(
-            status_code=400, detail="No user message found in the request messages."
-        )
-
-    # Send the user query to the LlamaIndex chat engine
-    try:
-        if request.stream:
-            logging.info("Starting streaming chat completion.")
-            # Returns an HTTP stream response using the async generator
-            return StreamingResponse(
-                stream_generator(user_message, request, chat_engine),
-                media_type="text/event-stream"
-            )
-
-        else:
-            logging.info("Getting synchronous chat completion.")
-            response = chat_engine.chat(user_message)
-
-            current_timestamp = int(time.time())
-
-        # Construct the response in the OpenAI standard format
-        return ChatCompletionResponse(
-            id="chatcmpl-custom-rag-1",
-            object="chat.completion",
-            created=current_timestamp,
-            model=request.model,
-            choices=[
-                ChatCompletionChoice(
-                    index=0,
-                    message=Message(role="assistant", content=response.response),
-                    finish_reason="stop",  # Assuming a natural stop
-                )
-            ],
-            usage=Usage(
-                prompt_tokens=0,  # Default to 0 due to difficulty in accurate tracking
-                completion_tokens=0,
-                total_tokens=0,
-            ),
-        )
-
-    except Exception as e:
-        logging.error(f"Error during chat completion: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error processing chat request: {e}"
-        )
-
-# Chat streaming response
-def format_sse_chunk(chunk: ChatCompletionChunk) -> str:
-    """Formats a Pydantic object into a Server-Sent Event (SSE) line."""
-    # Convert Pydantic object to JSON string
-    data_json = chunk.model_dump_json(exclude_none=True)
-    # Format as SSE message line (data: <JSON_STRING>\n\n)
-    return f"data: {data_json}\n\n"
-
-async def stream_generator(
-    user_message: str, 
-    request: ChatCompletionRequest, 
-    chat_engine
-):
-    """Generates the stream of SSE events for the FastAPI StreamingResponse."""
-    
-    current_timestamp = int(time.time())
-    
-    # 1. Initial Chunk (Role Assignment)
-    # The first chunk must set the role (assistant)
-    initial_chunk = ChatCompletionChunk(
-        created=current_timestamp,
-        model=request.model,
-        choices=[
-            ChatCompletionChunkChoice(
-                index=0,
-                delta=DeltaMessage(role="assistant"),
-                finish_reason=None
-            )
-        ]
-    )
-    yield format_sse_chunk(initial_chunk)
-
-    # 2. Token Chunks (Content Generation)
-    # Use LlamaIndex's streaming chat method
-    streaming_response = chat_engine.stream_chat(user_message)
-
-    # Iterate through the generator and yield tokens
-    for token in streaming_response.response_gen:
-        chunk = ChatCompletionChunk(
-            created=current_timestamp,
-            model=request.model,
-            choices=[
-                ChatCompletionChunkChoice(
-                    index=0,
-                    delta=DeltaMessage(content=token),
-                    finish_reason=None
-                )
-            ]
-        )
-        yield format_sse_chunk(chunk)
-
-    # 3. Final Chunk (Stop Signal)
-    # Send a final chunk with the stop reason
-    final_chunk = ChatCompletionChunk(
-        created=current_timestamp,
-        model=request.model,
-        choices=[
-            ChatCompletionChunkChoice(
-                index=0,
-                delta=DeltaMessage(), # Empty delta
-                finish_reason="stop" # Assuming a natural stop
-            )
-        ]
-    )
-    yield format_sse_chunk(final_chunk)
-
-    # 4. End Stream Marker
-    # The required termination line for the SSE stream
-    yield "data: [DONE]\n\n"
