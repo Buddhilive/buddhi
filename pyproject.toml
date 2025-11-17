@@ -1,0 +1,7 @@
+[project]
+name = "gemma-notebook"
+version = "0.1.0"
+description = "A locally running RAG chatbot powered by Google's Gemma models."
+dependencies = [
+    "streamlit>=1.51.0",
+]
