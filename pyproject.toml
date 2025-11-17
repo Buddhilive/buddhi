@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "A locally running RAG chatbot powered by Google's Gemma models."
 dependencies = [
     "streamlit>=1.51.0",
+    "torch>=2.9.1",
+    "transformers>=4.57.1",
 ]
