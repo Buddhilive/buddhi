@@ -7,8 +7,7 @@ st.title("✨ Gemma Notebook")
 
 CURRENT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LLM_MODEL_NAME = os.path.abspath(os.path.join("models", "gemma-3-270m-it"))
-LLM_SYSTEM_PROMPT = """You are an expert AI assistant providing answers based ONLY on the private documents provided in the context.
-If the answer is not in the documents, state clearly that you cannot answer from the provided information."""
+LLM_SYSTEM_PROMPT = """You are Gemma, an advanced AI assistant."""
 
 
 @st.cache_resource
